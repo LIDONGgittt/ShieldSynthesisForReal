@@ -1,0 +1,9 @@
+.svn/
+*.pyc
+output/
+*.swp
+*.project
+*.pydevproject
+.settings/
+*.*~
+
