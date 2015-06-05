@@ -1,0 +1,32 @@
+
+
+#/*******************************************************************************
+# Example Existance5)
+#
+# Spec: [](Q & !R -> (!R U (P & !R))) 
+#       whenever Q is true and R is false, !R must hold until (P & !R)
+#       holds (which must happen eventually)
+# difference to Existance4: we cannot stay in state 2 with the self
+# loop !P & !R forever, but must give P eventually (before R).
+#       Liveness-to-safety-bound: 1
+#       i.e., P & !R must become true after at most 1 step
+#
+#
+#***************************************************************************/
+
+dfa 3 0 3 1 1 3
+1                   #initial state
+3                   #final (rejecting) state
+1 1 2
+1 1 -1
+1 1 3
+1 2 1 -2 -3
+2 3 -2 -3           # allowed in existance4 but not here
+2 1 -2 3
+2 3 2
+3 3
+1 Q
+2 R
+3 P
+
+

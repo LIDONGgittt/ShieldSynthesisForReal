@@ -1,0 +1,26 @@
+
+
+#/*******************************************************************************
+# Example Traffic)
+#
+# Spec: G(!farm_light & !hwy_light) & 
+#       G(farm_light & !hwy_light -> X(!farm_light & hwy_light))  
+#	G(!farm_light & hwy_light -> X(farm_light & !hwy_light)) 
+# Input: 
+# Output farm_light hwy_light;
+#
+# Dummy Design: All Outputs are always False 
+#
+#***************************************************************************/
+
+dfa 1 0 2 1 1 3
+1                   #initial state
+1                   #final state
+1 1 -1 -2             
+1 1 1 -2
+1 1 -1 2
+1 farm_light
+2 hwy_light
+
+
+

@@ -1,0 +1,33 @@
+
+
+#/*******************************************************************************
+# Example amba02_2)
+#
+# Spec: (G((hmaster0=1) -> (hbusreq1=0 <-> busreq=0)))
+# Input: hbusreq1
+# Output: hmaster0, busreq
+#                                              
+#               (hmaster0 & hbusreq1 != busreq)         
+#   (S1) ----------------------------------------------> ((S2))        
+#   |  ^            		                          |  ^                      	  
+#   |__|            		                          |__|                                  
+#  (hmaster0 & hbusreq1 = busreq)         		  true
+#  OR !hmaster0 
+#               
+#	                 	
+#***************************************************************************/
+
+dfa 2 1 2 1 1 6
+1                   #initial state
+2                   #final state
+1 1 1 2 3
+1 1 -1 2 -3
+1 1 -2
+1 2 1 2 -3
+1 2 -1 2 3
+2 2 
+1 hbusreq1
+2 hmaster0
+3 busreq
+
+

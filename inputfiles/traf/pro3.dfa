@@ -1,0 +1,40 @@
+## s1 farm ok
+## s2 both block
+## s3 high way ok
+## s4 error
+
+dfa 4 1 2 1 1 22
+1              #farm way ok
+4              #error
+
+1 2 -2 -3      #-rr go to s2
+1 1 -1 2 -3    #0gr is fine, stay at s1
+1 4 1 2 3      #any other go to error
+1 4 1 -2 3
+1 4 1 2 -3
+1 4 -1 2 3
+1 4 -1 -2 3
+
+2 2 -2 -3      #-rr stay at s2
+2 1 -1 2 -3    #0gr is fine, go to s1
+2 3 -1 -2 3    #0rg is fine, go to s3
+2 4 1 2 3      #any other go to error
+2 4 1 -2 3
+2 4 1 2 -3
+2 4 -1 2 3
+
+3 2 -2 -3      #-rr go to s2
+3 3 -1 -2 3    #0rg is fine, stay at s3
+3 4 1 2 3      #any other go to error
+3 4 1 -2 3
+3 4 1 2 -3
+3 4 -1 2 3
+3 4 -1 2 -3
+4 4
+
+1 emergeny
+2 farm_ok
+3 hwy_ok 
+
+
+

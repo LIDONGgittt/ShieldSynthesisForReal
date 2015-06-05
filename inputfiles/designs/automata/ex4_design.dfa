@@ -1,0 +1,31 @@
+
+#/*******************************************************************************
+# Example 4)
+#
+# Spec: a request "r" must be followed by an "a" and then by a "b"
+# Design with 1 Error: First request is only followed by an "a", not by a "b" 
+#
+# Design:   
+#
+#                                                    r & a & !b
+#                --    r & a & !b      !a & !b	      ------>
+# !r & !a & !b  |  (S1)---------->(S2) --------> (S3)          (S4)
+#                ->                        	  |  ^ <------
+#	                                          |__|  !a & b
+# 				               r & !a & !b
+#           	     
+#
+#***************************************************************************/
+
+dfa 4 1 2 1 1 6
+1                   #initial state
+4                   #final state
+1 1 -1 -2 -3            
+1 2 1 2 -3
+2 3 -2 -3    
+3 3 -1 -2 -3
+3 4 1 2 -3
+4 3 -2 3     
+1 r
+2 a
+3 b 

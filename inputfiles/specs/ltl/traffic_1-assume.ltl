@@ -1,0 +1,36 @@
+###############################################
+# Input variable definition
+###############################################
+#[INPUT_VARIABLES]
+
+###############################################
+# Output variable definition
+###############################################
+#[OUTPUT_VARIABLES]
+#farm_light; 
+#hwy_light;
+
+###############################################
+# Environment specification
+###############################################
+#[ENV_INITIAL]
+
+#[ENV_TRANSITIONS]
+
+#[ENV_FAIRNESS]
+
+###############################################
+# System specification
+###############################################
+#[SYS_INITIAL]
+#farm_light=0;
+#hwy_light=0;
+
+#[SYS_TRANSITIONS]
+G(((farm_light=0) * (hwy_light=0)) -> FALSE);
+G(((farm_light=0) * (hwy_light=1)) -> X(((farm_light=0) * (hwy_light=1))+((farm_light=1) * (hwy_light=1))));
+G(((farm_light=1) * (hwy_light=0)) -> X(((farm_light=1) * (hwy_light=0))+((farm_light=1) * (hwy_light=1))));
+
+#[SYS_FAIRNESS]
+
+

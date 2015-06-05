@@ -1,0 +1,87 @@
+
+
+#/*******************************************************************************
+# Example AMBA G7)
+#
+# G (DECIDE & X(HGRANT[i]) -> (HLOCK[i] <-> X(LOCKED))
+#
+# Input: hlock0, hlock1
+# Output: decide, hgrant0, hgrant1, locked
+#            	
+#***************************************************************************/
+
+dfa 6 2 4 1 1 62
+1                   #initial state
+6                   #final state
+1 1 -3              # state1: !decide
+1 2 -1 -2 3         # state2: !hlock0 & !hlock1
+1 3 1 -2 3          # state3: hlock0 & !hlock1
+1 4 -1 2 3          # state4: !hlock0 & hlock1
+1 5 1 2 3           # state5: hlock0 & hlock1
+2 1 -3 4 -5 -6         # if hgrant0
+2 1 -3 -4 5 -6         # if hgrant1
+2 2 -1 -2 3 4 -5 -6         # if hgrant0
+2 2 -1 -2 3 -4 5 -6         # if hgrant0
+2 3 1 -2 3 4 -5 -6         # if hgrant1
+2 3 1 -2 3 -4 5 -6         # if hgrant1
+2 4 -1 2 3 4 -5 -6
+2 4 -1 2 3 -4 5 -6
+2 5 1 2 3 4 -5 -6
+2 5 1 2 3 -4 5 -6
+2 6 4 6             # if hgrant0 & locked   
+2 6 5 6             # if hgrant1 & locked   
+2 6 4 5             # grant to both device or grant to nothing lead to error
+2 6 -4 -5
+3 1 -3 4 -5 6          # if hgrant0, locked = hlock0 should be 1
+3 1 -3 -4 5 -6         # if hgrant1, locked = hlock1 should be 0
+3 2 -1 -2 3 4 -5 6          # if hgrant0
+3 2 -1 -2 3 -4 5 -6          # if hgrant0
+3 3 1 -2 3 4 -5 6           # if hgrant1
+3 3 1 -2 3 -4 5 -6         # if hgrant1
+3 4 -1 2 3 4 -5 6  
+3 4 -1 2 3 -4 5 -6
+3 5 1 2 3 4 -5 6  
+3 5 1 2 3 -4 5 -6 
+3 6 4 -6            # if hgrant0 & !locked   
+3 6 5 6             # if hgrant1 & locked   
+3 6 4 5             # grant to both device or grant to nothing lead to error
+3 6 -4 -5
+4 1 4 -5 -6         # if hgrant0, locked = hlock0 should be 0
+4 1 -4 5 6          # if hgrant1, locked = hlock1 should be 1
+4 2 -1 -2 3 4 -5 -6          # if hgrant0
+4 2 -1 -2 3 -4 5 6          # if hgrant0
+4 3 1 -2 3 4 -5 -6           # if hgrant1
+4 3 1 -2 3 -4 5 6         # if hgrant1
+4 4 -1 2 3 4 -5 -6  
+4 4 -1 2 3 -4 5 6
+4 5 1 2 3 4 -5 -6  
+4 5 1 2 3 -4 5 6 
+4 6 4 6             # if hgrant0 & !locked   
+4 6 5 -6            # if hgrant1 & locked   
+4 6 4 5             # grant to both device or grant to nothing lead to error
+4 6 -4 -5
+5 1 4 -5 6          # if hgrant0, locked = hlock0 should be 0
+5 1 -4 5 6          # if hgrant1, locked = hlock1 should be 1
+5 2 -1 -2 3 4 -5 6          # if hgrant0
+5 2 -1 -2 3 -4 5 6          # if hgrant0
+5 3 1 -2 3 4 -5 6           # if hgrant1
+5 3 1 -2 3 -4 5 6         # if hgrant1
+5 4 -1 2 3 4 -5 6  
+5 4 -1 2 3 -4 5 6
+5 5 1 2 3 4 -5 6  
+5 5 1 2 3 -4 5 6
+5 6 4 -6            # if hgrant0 & !locked   
+5 6 5 -6            # if hgrant1 & locked   
+5 6 4 5             # grant to both device or grant to nothing lead to error
+5 6 -4 -5
+6 6
+1 hlock0
+2 hlock1
+3 decide
+4 hgrant0
+5 hgrant1
+6 locked
+
+
+
+

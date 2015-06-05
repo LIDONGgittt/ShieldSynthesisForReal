@@ -1,0 +1,22 @@
+
+
+#/*******************************************************************************
+# Example Existance2)
+#
+# Spec: <>(P)
+#       P becomes true eventually
+#       Liveness-to-safety-bound: 0
+#       i.e., P must become true immediately
+#
+#***************************************************************************/
+
+dfa 3 0 1 1 1 3
+1                   #initial state
+3                   #final (rejecting) state
+1 2 1
+1 3 -1
+2 2
+3 3
+1 P
+
+

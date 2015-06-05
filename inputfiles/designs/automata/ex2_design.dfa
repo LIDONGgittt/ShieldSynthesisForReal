@@ -1,0 +1,29 @@
+
+#/*******************************************************************************
+# Example 2)
+#
+# Spec: a request must be followed by two grants
+# Design with 1 Error: First request is followed by only one grant
+#
+#                                            r AND g
+#            --    r AND g    	!g	     ------>
+# !r AND !g |  (S1)------>(S2) ------> (S3)          (S4)
+#            ->                        |  ^  <------
+#	                               |__|     g
+# 				    !r AND !g
+#           
+#
+#***************************************************************************/
+
+
+dfa 4 1 1 1 1 7
+1                   #initial state
+4		    #final state
+1 1 -1 -2            
+1 2 1 2 
+2 3 -2
+3 3 -1 -2
+3 4 1 2 
+4 3 2            
+1 r
+2 g 

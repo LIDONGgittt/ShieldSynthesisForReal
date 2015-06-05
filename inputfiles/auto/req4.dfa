@@ -1,0 +1,33 @@
+
+
+#/*******************************************************************************
+# Example toyota auto
+#
+# Spec: if gp =0 and bp=0 and tc =1, then throttle =1, and brake =0  
+# Input: gp, bp, tc
+# Output th, br 
+#
+#***************************************************************************/
+dfa 2 3 2 1 1 12
+1                   #initial state
+2                   #final state
+1 1 -1 -2 3 4 -5    #if gp =0 and bp=0 and tc =1, then throttle =1, and brake =0  
+1 1 -1 -2 -3        #or other 7 cases except for input
+1 1 -1 2 -3         
+1 1 -1 2 3
+1 1 1 -2 -3
+1 1 1 -2 3
+1 1 1 2 -3
+1 1 1 2 3 
+1 2 -1 -2 3 -4 5    #or other 3 cases with input gp =0 and bp=0 and tc =1 
+1 2 -1 -2 3 -4 -5   #but output is not (throttle =1, and brake =0)  
+1 2 -1 -2 3 4 5    
+2 2
+1 gp
+2 bp
+3 tc
+4 throttle
+5 brake
+
+
+

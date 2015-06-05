@@ -1,0 +1,35 @@
+
+
+#/*******************************************************************************
+# Example Existance2)
+#
+# Spec: [](!Q) | <>(Q & <>P))
+#       if Q ever becomes true, then P must become true at some
+#       point from there on.
+#       Liveness-to-safety-bound: 4
+#       i.e., P must become true 4 time steps after Q become true
+#       at the latest.
+#
+#
+#***************************************************************************/
+
+dfa 7 0 2 1 1 3
+1                   #initial state
+7                   #final (rejecting) state
+1 1 -1
+1 6 1 2
+1 2 1 -2
+2 6 2
+2 3 -2
+3 6 2
+3 4 -2
+4 6 2
+4 5 -2
+5 6 2
+5 7 -2
+6 6
+7 7
+1 Q
+2 P
+
+

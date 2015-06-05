@@ -1,0 +1,28 @@
+
+
+#/*******************************************************************************
+# Example Existance4)
+#
+# Spec: [](Q & !R -> (!R W (P & !R))) 
+#       whenever Q is true and R is false, P must become true before
+#       R (or never if R never becomes true)
+#
+#
+#***************************************************************************/
+
+dfa 3 0 3 1 1 3
+1                   #initial state
+3                   #final (rejecting) state
+1 1 2
+1 1 -1
+1 1 3
+1 2 1 -2 -3
+2 2 -2 -3
+2 1 -2 3
+2 3 2
+3 3
+1 Q
+2 R
+3 P
+
+

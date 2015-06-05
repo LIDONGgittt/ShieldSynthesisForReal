@@ -1,0 +1,23 @@
+
+#/*******************************************************************************
+# Example 3)
+#
+# Spec: A request "r" must be followed by either two "a" or two "b"
+#
+# Design: Answers first request with a=b=True
+#	  	  
+#***************************************************************************/
+
+dfa 4 1 2 1 1 8
+1                   #initial state
+4                   #final state
+1 1 -1 -2 -3              
+1 2 1 2 3 
+2 3 2 -3
+3 3 -1 -2 -3
+3 4 1 2 -3
+4 3 2 -3   
+1 r
+2 a
+3 b 
+

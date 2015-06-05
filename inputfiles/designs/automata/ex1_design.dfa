@@ -1,0 +1,27 @@
+
+#/*******************************************************************************
+# Example 1)
+#
+# Spec: A request "r" must be followed by either an "a1"and then by an "a2"
+#	or by an "b1" and then by an "b2"
+#	Additionally, if there is a request "r", either "a1" or "b1" has to be false.
+#
+# Design: First request is not answered by an "a1", but not by an "a2"
+#	  	  
+#***************************************************************************/
+
+dfa 4 1 4 1 1 8
+1                   #initial state
+4                   #final state
+1 1 -1 -2 -3 -4 -5             
+1 2 1 2 -3 -4 -5 
+2 3 -2 -3 -4 -5
+3 3 -1 -2 -3 -4 -5
+3 4 1 2 -3 -4 -5
+4 3 -2 3 -4 -5 
+1 r
+2 a1
+3 a2 
+4 b1
+5 b2
+

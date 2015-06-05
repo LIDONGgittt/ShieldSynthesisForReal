@@ -1,0 +1,25 @@
+
+
+#/*******************************************************************************
+# Example Absence2)
+#
+# Spec: <>R -> (!P U R)
+#       If R is true at some point, then !P must hold before that
+#       point.
+# Inputs: R
+# Outputs: P
+#
+#***************************************************************************/
+
+dfa 4 0 2 1 1 7
+1                   #initial state
+4                   #final (rejecting) state
+1 1 -1 -2
+1 2 1
+1 3 -1 2
+2 2
+3 3 -1
+3 4 1
+4 4
+1 R
+2 P
