@@ -278,8 +278,10 @@ USAGE
         else:
             algorithm = FiniteDesignErrorAlgo(spec_dfa, 1, allowed_dev)
             
-        synthesis = Synthesizer(shield_algorithm, allowed_dev, algorithm.etDFA_, algorithm.sdDFA_, algorithm.scDFA_, algorithm.drDFA_)
-    
+        synthesis = Synthesizer(shield_algorithm, allowed_dev)
+        synthesis.synthesize_comp(algorithm.etDFA_, algorithm.sdDFA_, algorithm.scDFA_, algorithm.drDFA_)
+        
+        
         while not synthesis.existsWinningRegion():
             synthesis = None    #give GC time to destroy previous manager instance
             allowed_dev = allowed_dev + 1

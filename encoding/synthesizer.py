@@ -28,7 +28,7 @@ class Synthesizer(object):
     these properties, so they can be used to relax the synthesis.  
     '''
 
-    def __init__(self, algorithm, num_shield_deviations, error_tracking_dfa, deviation_dfa, correctness_dfa, relax_dfa):
+    def __init__(self, algorithm, num_shield_deviations):
         #print ("======================================\n synthesis  \n======================================\n")
         #init pycudd
         self.mgr_ = pycudd.DdManager()
@@ -39,14 +39,7 @@ class Synthesizer(object):
         self.num_shield_deviations_ = num_shield_deviations
         self.allowed_design_error_ = 1
 
-        self.error_tracking_dfa_ = error_tracking_dfa
-        self.deviation_dfa_ = deviation_dfa
-        self.correctness_dfa_ = correctness_dfa
-        self.relax_dfa_ = relax_dfa
-        
-        self.dfa_list_ = [self.error_tracking_dfa_, self.deviation_dfa_, self.correctness_dfa_]
-        if len(self.relax_dfa_.getNodes())>0:
-            self.dfa_list_.append(self.relax_dfa_)
+
 
         self.input_vars_ = []
         self.output_vars_ = []
@@ -62,10 +55,146 @@ class Synthesizer(object):
         self.err_state_bdd_ = self.mgr_.Zero()
         self.win_region_ = self.mgr_.Zero()
 
+
+
+    def synthesize_comp(self, error_tracking_dfa, deviation_dfa, correctness_dfa, relax_dfa):
+   
+   
+        
+        self.error_tracking_dfa_ = error_tracking_dfa
+        self.deviation_dfa_ = deviation_dfa
+        self.correctness_dfa_ = correctness_dfa
+        self.relax_dfa_ = relax_dfa
+        
+        self.dfa_list_ = [self.error_tracking_dfa_, self.deviation_dfa_, self.correctness_dfa_]
+        
+        self.comp_dfa_list_0 = [self.correctness_dfa_]
+        self.comp_dfa_list_1 = [self.error_tracking_dfa_, self.deviation_dfa_]
+        
+        
         self.tmp_count_= 1
         self.result_model_ = ""
 
-        self.synthesize()
+        if len(self.relax_dfa_.getNodes())>0:
+            self.dfa_list_.append(self.relax_dfa_)
+            self.comp_dfa_list_0.append(self.relax_dfa_)
+            self.comp_dfa_list_1.append(self.relax_dfa_)
+            
+            
+
+        # 1. calc non-determistic strategy from scDFA and drDFA
+        self.new_var_names_ = dict()
+        for dfa in self.dfa_list_:
+            #add input vars
+            for input_var in dfa.getInputVars():
+                if input_var not in self.input_vars_:
+                    self.input_vars_.append(input_var)
+                    self.in_out_var_names_[input_var]= dfa.getVarName(input_var)
+                    self.new_var_names_[input_var]= dfa.getVarName(input_var)
+                    
+
+            #add output vars
+            for output_var in dfa.getOutputVars():
+                if output_var not in self.output_vars_:
+                    self.output_vars_.append(output_var)
+                    self.in_out_var_names_[output_var]= dfa.getVarName(output_var)
+                    self.new_var_names_[output_var]= dfa.getVarName(output_var)
+
+
+        #encode states and create init_state
+        # (create state bdds for all state bits of all automata)
+        state_order= self.encode_states()
+
+        self.create_init_states_comp0()
+        #encode variables
+        var_order = self.encode_variables()
+
+        #build next state vars
+        self.next_state_vars_bdd_ = []
+        for state_pos in range(0,self.num_of_bits_):
+            self.next_state_vars_bdd_.append(self.var_bdds_['s'+str(self.num_of_bits_-1-state_pos)+'n'])
+
+        #build input variables bdds
+        self.in_var_bdds_ = []
+        for var in self.input_vars_:
+            self.in_var_bdds_.append(self.var_bdds_["v"+str(var-1)])
+
+        #build output variables bdds
+        self.out_var_bdd_ = []
+        for var in self.output_vars_:
+            self.out_var_bdd_.append(self.var_bdds_["v"+str(var-1)])
+
+
+        transition_bdds = []
+        for dfa in self.comp_dfa_list_0:
+            transition_bdds.append(self.encode_transitions(dfa))
+
+        #encode final transition relation
+        for transition_bdd in transition_bdds:
+            self.transition_bdd_ &= transition_bdd
+
+
+        self.create_error_states_comp0()
+        
+        #calculate winning region
+        self.win_region_ = self.calc_winning_region()
+        #print "win_region"
+        #self.win_region_.PrintMinterm()
+
+        if self.win_region_ != self.mgr_.Zero():
+            #print("winning region:")
+            #self.win_region_.PrintMinterm()
+                    
+            non_det_strategy_comp0 = self.get_nondet_strategy(self.win_region_)
+            #print ("non-det-strategy")
+            #non_det_strategy.PrintMinterm()
+        else:
+               
+            non_det_strategy_comp0 = self.mgr_.Zero()
+            print 'cannot find wining region for scDFA+drDFA!'
+
+
+
+        # 2. calc non-determistic strategy from etDFA, sdDFA and drDFA
+
+        self.init_state_bdd_ = self.mgr_.One()
+        self.transition_bdd_ = self.mgr_.One()
+        self.err_state_bdd_ = self.mgr_.Zero()
+        self.win_region_ = self.mgr_.Zero()
+        
+        
+        self.create_init_states_comp1()
+
+        transition_bdds = []
+        for dfa in self.comp_dfa_list_1:
+            transition_bdds.append(self.encode_transitions(dfa))
+
+        #encode final transition relation
+        for transition_bdd in transition_bdds:
+            self.transition_bdd_ &= transition_bdd
+
+
+        self.create_error_states_comp1()
+
+
+        self.win_region_ = self.calc_winning_region()
+
+
+        if self.win_region_ != self.mgr_.Zero():
+            #print("winning region:")
+            #self.win_region_.PrintMinterm()
+                    
+            non_det_strategy_comp1 = self.get_nondet_strategy(self.win_region_)
+            #print ("non-det-strategy")
+            #non_det_strategy.PrintMinterm()
+        else:
+            non_det_strategy_comp1 = self.mgr_.Zero()
+            print 'cannot find wining region for scDFA+drDFA!'
+
+
+        non_det_strategy = non_det_strategy_comp0 & non_det_strategy_comp1
+        self.func_by_var_ = self.extract_output_funcs(non_det_strategy)
+            
 
     def synthesize(self):
 
@@ -86,8 +215,12 @@ class Synthesizer(object):
 
         #encode states and create init_state
         # (create state bdds for all state bits of all automata)
-        state_order= self.encode_states_and_create_init_state()
+        #state_order= self.encode_states_and_create_init_state()
 
+
+        state_order= self.encode_states()
+
+        self.create_init_states()
         #encode variables
         var_order = self.encode_variables()
 
@@ -138,15 +271,7 @@ class Synthesizer(object):
 
             #comute next states functions bdd and output functions bdd
             self.func_by_var_ = self.extract_output_funcs(non_det_strategy)
-
-
-    #def printBddState(self, bdd):
         
-        
-         
-         
-         
-
 
     def getResultModel(self, out_format=NUSMV):
 
@@ -177,7 +302,46 @@ class Synthesizer(object):
         else:
             return False
 
-    def encode_states_and_create_init_state(self):
+    def create_init_states_comp0(self):
+        #create initial state bdd
+        
+        init_state_cor = self.correctness_dfa_.getInitialNodes()[0]
+        self.init_state_bdd_ &= self.make_node_state_bdd(init_state_cor.getNr()-1, self.correctness_dfa_)
+
+        if len(self.relax_dfa_.getNodes())>0:
+            init_state_rel = self.relax_dfa_.getInitialNodes()[0]
+            self.init_state_bdd_ &= self.make_node_state_bdd(init_state_rel.getNr()-1, self.relax_dfa_)
+
+    def create_init_states_comp1(self):
+        #create initial state bdd
+        
+        init_state_et = self.error_tracking_dfa_.getInitialNodes()[0]
+        self.init_state_bdd_ &= self.make_node_state_bdd(init_state_et.getNr()-1, self.error_tracking_dfa_)
+
+        init_state_dev = self.deviation_dfa_.getInitialNodes()[0]
+        self.init_state_bdd_ &= self.make_node_state_bdd(init_state_dev.getNr()-1, self.deviation_dfa_)
+
+        if len(self.relax_dfa_.getNodes())>0:
+            init_state_rel = self.relax_dfa_.getInitialNodes()[0]
+            self.init_state_bdd_ &= self.make_node_state_bdd(init_state_rel.getNr()-1, self.relax_dfa_)
+            
+    def create_init_states(self):
+        #create initial state bdd
+        init_state_et = self.error_tracking_dfa_.getInitialNodes()[0]
+        self.init_state_bdd_ &= self.make_node_state_bdd(init_state_et.getNr()-1, self.error_tracking_dfa_)
+
+        init_state_dev = self.deviation_dfa_.getInitialNodes()[0]
+        self.init_state_bdd_ &= self.make_node_state_bdd(init_state_dev.getNr()-1, self.deviation_dfa_)
+
+        init_state_cor = self.correctness_dfa_.getInitialNodes()[0]
+        self.init_state_bdd_ &= self.make_node_state_bdd(init_state_cor.getNr()-1, self.correctness_dfa_)
+
+        if len(self.relax_dfa_.getNodes())>0:
+            init_state_rel = self.relax_dfa_.getInitialNodes()[0]
+            self.init_state_bdd_ &= self.make_node_state_bdd(init_state_rel.getNr()-1, self.relax_dfa_)
+
+
+    def encode_states(self):
 
         num_of_bits_dict = dict()
 
@@ -209,29 +373,28 @@ class Synthesizer(object):
             self.var_bdds_[state_name]=node_bdd
             state_order += state_name + " "
 
-        #create initial state bdd
-        init_state_et = self.error_tracking_dfa_.getInitialNodes()[0]
-        self.init_state_bdd_ &= self.make_node_state_bdd(init_state_et.getNr()-1, self.error_tracking_dfa_)
 
-        init_state_dev = self.deviation_dfa_.getInitialNodes()[0]
-        self.init_state_bdd_ &= self.make_node_state_bdd(init_state_dev.getNr()-1, self.deviation_dfa_)
-
-        init_state_cor = self.correctness_dfa_.getInitialNodes()[0]
-        self.init_state_bdd_ &= self.make_node_state_bdd(init_state_cor.getNr()-1, self.correctness_dfa_)
-
-        if len(self.relax_dfa_.getNodes())>0:
-            init_state_rel = self.relax_dfa_.getInitialNodes()[0]
-            self.init_state_bdd_ &= self.make_node_state_bdd(init_state_rel.getNr()-1, self.relax_dfa_)
          
         #print "Init_state_BDD"
         #self.init_state_bdd_.PrintMinterm()
         return state_order
 
+    def encode_new_variables(self):
+        var_order=""
+        for var in self.new_in_out_var_names_:
+            var_num = var-1
+            var_name = self.new_in_out_var_names_[var]
+            var_order += var_name+" "
+            self.var_names_.append(var_name)
+            node_bdd = self.mgr_.IthVar(len(self.var_bdds_))
+            self.var_bdds_["v"+str(var_num)] = node_bdd
+        return var_order   
+    
     def encode_variables(self):
         var_order=""
-        for var in self.in_out_var_names_:
+        for var in self.new_var_names_:
             var_num = var-1
-            var_name = self.in_out_var_names_[var]
+            var_name = self.new_var_names_[var]
             var_order += var_name+" "
             self.var_names_.append(var_name)
             node_bdd = self.mgr_.IthVar(len(self.var_bdds_))
@@ -286,8 +449,68 @@ class Synthesizer(object):
                 relax_state_bdds += relax_state_bdd
         
         self.relax_state_bdd_ += relax_state_bdds
+    def create_error_states_comp0(self):
+  
+        #Rules for error states:
+        #1. Correctness: A state is unsafe, if shieldError_ is true
+        error_bdd_1 = self.mgr_.Zero()
+        if len(self.relax_dfa_.getNodes())>0:
+            for state in self.correctness_dfa_.getNodes():
+                for rel_state in self.relax_dfa_.getNodes():
+                    if state.getShieldError():
+                        if rel_state.getRelaxError() == 0:
+                            error_state_bdd_1 = self.make_node_state_bdd(state.getNr()-1, self.correctness_dfa_)
+                            error_state_bdd_2 = self.make_node_state_bdd(rel_state.getNr()-1, self.relax_dfa_)
+                            error_bdd_1 += (error_state_bdd_1 & error_state_bdd_2)
+        else:
+            for state in self.correctness_dfa_.getNodes():
+                if state.getShieldError():
+                    error_state_bdd = self.make_node_state_bdd(state.getNr()-1, self.correctness_dfa_)
+                    error_bdd_1 += error_state_bdd
+        #print "ERROR BDD 1. Correctness: A state is unsafe, if shieldError_ is true"
+        #error_bdd_1.PrintMinterm()
+        #print "=============="
+
+        self.err_state_bdd_ = error_bdd_1
 
 
+    def create_error_states_comp1(self):
+  
+        #Rules for error states:
+        #2. No shield-deviation before system error:
+        error_bdd_2 = self.mgr_.Zero()
+        
+        if len(self.relax_dfa_.getNodes())>0:
+            for dev_state in self.deviation_dfa_.getNodes():
+                for et_state in self.error_tracking_dfa_.getNodes():
+                    for rel_state in self.relax_dfa_.getNodes():
+                        if dev_state.getShieldDeviation()>0:
+                            if et_state.getDesignError()==0:
+                                if rel_state.getRelaxError() == 0:
+                                    err_state_bdd_1 = self.make_node_state_bdd(dev_state.getNr()-1, self.deviation_dfa_)
+                                    err_state_bdd_2 = self.make_node_state_bdd(et_state.getNr()-1, self.error_tracking_dfa_)
+                                    err_state_bdd_3 = self.make_node_state_bdd(rel_state.getNr()-1, self.relax_dfa_)
+                                    err_state_bdd = err_state_bdd_1
+                                    err_state_bdd &= err_state_bdd_2
+                                    err_state_bdd &= err_state_bdd_3
+                                    error_bdd_2 += err_state_bdd
+        else:
+            for dev_state in self.deviation_dfa_.getNodes():
+                for et_state in self.error_tracking_dfa_.getNodes():
+                    if dev_state.getShieldDeviation()>0:
+                        if et_state.getDesignError()==0:
+                            err_state_bdd_1 = self.make_node_state_bdd(dev_state.getNr()-1, self.deviation_dfa_)
+                            err_state_bdd_2 = self.make_node_state_bdd(et_state.getNr()-1, self.error_tracking_dfa_)
+                            err_state_bdd = err_state_bdd_1
+                            err_state_bdd &= err_state_bdd_2
+                            error_bdd_2 += err_state_bdd
+        #print "ERROR BDD 1. Correctness: A state is unsafe, if shieldError_ is true"
+        #error_bdd_1.PrintMinterm()
+        #print "=============="
+
+        self.err_state_bdd_ = error_bdd_2
+        
+        
     def create_error_states(self):
 
         # find final states according to given algorithm (K_STABILIZING_ALGORITHM or FINITE_ERROR_ALGORITHM)
@@ -449,149 +672,238 @@ class Synthesizer(object):
 
         return forall_inputs
 
+
+  
+#     def get_nondet_strategy(self,win_region_bdd):
+#         """ Get non-deterministic strategy from the winning region.
+#         If the system outputs values that satisfy this non-deterministic strategy, then the system wins.
+#         I.e., a non-deterministic strategy describes for each state all possible plausible output values:
+#  
+#         :return: non deterministic strategy bdd
+#         :note: The strategy is still not-deterministic. Determinization step is done later.
+#         """
+#  
+#         #: :type: DdNode
+#         primed_win_region_bdd = self.prime_states(win_region_bdd)
+#  
+#         #print "primed_win_region_bdd"
+#         #primed_win_region_bdd.PrintMinterm()
+#  
+#         intersection = (primed_win_region_bdd & self.transition_bdd_)
+#  
+#         #print "intersection"
+#         #intersection.PrintMinterm()
+#  
+#  
+#         next_vars_cube = self.prime_states(self.get_cube(self.get_all_state_bdds()))
+#         strategy = intersection.ExistAbstract(next_vars_cube)
+#  
+#         #print "nondet strategy"
+#         #print strategy.PrintMinterm()
+#  
+#         return strategy
+ 
     def get_nondet_strategy(self,win_region_bdd):
-        """ Get non-deterministic strategy from the winning region.
-        If the system outputs values that satisfy this non-deterministic strategy, then the system wins.
-        I.e., a non-deterministic strategy describes for each state all possible plausible output values:
-
-        :return: non deterministic strategy bdd
-        :note: The strategy is still not-deterministic. Determinization step is done later.
-        """
-
-        #: :type: DdNode
+         
         primed_win_region_bdd = self.prime_states(win_region_bdd)
-
-        #print "primed_win_region_bdd"
-        #primed_win_region_bdd.PrintMinterm()
-
-        intersection = (primed_win_region_bdd & self.transition_bdd_)
-
-        #print "intersection"
-        #intersection.PrintMinterm()
-
-
-        next_vars_cube = self.prime_states(self.get_cube(self.get_all_state_bdds()))
-        strategy = intersection.ExistAbstract(next_vars_cube)
-
-        #print "nondet strategy"
-        #print strategy.PrintMinterm()
-
+         
+        strategy = (primed_win_region_bdd & self.transition_bdd_) & win_region_bdd
+         
         return strategy
-
+  
+  
     def extract_output_funcs(self, non_det_strategy):
-        """
-        Calculate BDDs for output functions given a non-deterministic winning strategy.
-        Cofactor-based approach.
-
-        :return: dictionary ``controllable_variable_bdd -> func_bdd``
-        """
-
+ 
+         
+ 
         output_models = dict()
         all_outputs = list(self.out_var_bdd_)
         all_next_state_vars = list(self.next_state_vars_bdd_)
         all_next_states_and_outputs = all_outputs + all_next_state_vars
-
+         
+         
+        next_vars_cube = self.prime_states(self.get_cube(self.get_all_state_bdds()))
+        out_var_strategy = non_det_strategy.ExistAbstract(next_vars_cube)
+ 
         #----------- output functions--------------
-
+ 
         for c in self.out_var_bdd_:
-
+ 
             others = set(set(all_outputs).difference({c}))
-
+ 
             if others:
                 others_cube = self.get_cube(others)
                 #: :type: DdNode
-                c_arena = non_det_strategy.ExistAbstract(others_cube)
+                c_arena = out_var_strategy.ExistAbstract(others_cube)
             else:
-                c_arena = non_det_strategy
-
+                c_arena = out_var_strategy
+ 
             can_be_true = c_arena.Cofactor(c)  # states (x,i) in which c can be true
             can_be_false = c_arena.Cofactor(~c)
-
-            #print'can_be_true'
-            #can_be_true.PrintMinterm()
-            #print'can_be_false'
-            #can_be_false.PrintMinterm()
-            #print
-
-            # We need to intersect with can_be_true to narrow the search.
-            # Negation can cause including states from !W (with err=1)
-            #: :type: DdNode
+ 
             must_be_true = (~can_be_false) & can_be_true
             must_be_false = (~can_be_true) & can_be_false
-
-            #print "must_be_true"
-            #must_be_true.PrintMinterm()
-            #print "must_be_false"
-            #must_be_false.PrintMinterm()
-            #print
-
+ 
             care_set = (must_be_true | must_be_false)
-            
-            # begin compute reachable states:
-            # reach = self.init_state_bdd_
-            # old_reach = self.mgr_.Zero()
-            # while reach != old_reach:
-            #     old_reach = reach
-            #     reach = reach | self.suc_sys_bdd(reach, non_det_strategy & self.transition_bdd_ )
-            # care_set = care_set & reach
-            # end compute reachable states
-
-            #print'care set is'
-            #care_set.PrintMinterm()
-
-            # We use 'restrict' operation, but we could also do just:
-            # c_model = must_be_true -> care_set
-            # ..but this is (probably) less efficient, since we cannot set c=1 if it is not in care_set, but we could.
-            #
-            # Restrict on the other side applies optimizations to find smaller bdd.
-            # It cannot be expressed using boolean logic operations since we would need to say:
-            # must_be_true = ite(care_set, must_be_true, "don't care")
-            # and "don't care" cannot be expressed in boolean logic.
-
-            # Restrict operation:
-            #   on care_set: must_be_true.restrict(care_set) <-> must_be_true
+             
             c_model = must_be_true.Restrict(care_set)
-
+ 
             output_models[c] = c_model
-
-            non_det_strategy = non_det_strategy & self.make_bdd_eq(c, c_model)
-
+ 
+            out_var_strategy = out_var_strategy & self.make_bdd_eq(c, c_model)
             #print "Strategy for output variable "
             #c.PrintMinterm()
-
+ 
             #print'on_set: Var is True'
             #c_model.PrintMinterm()
             #print'off_set: Var is False'
             #(~c_model).PrintMinterm()
-
+ 
         #----------- next state functions--------------
-
-        non_det_strategy = non_det_strategy & self.transition_bdd_
-
+ 
+        output_vars_cube = self.get_cube(self.out_var_bdd_)
+        next_state_strategy = non_det_strategy.ExistAbstract(output_vars_cube)
+ 
         for c in self.next_state_vars_bdd_:
             others = set(set(all_next_states_and_outputs).difference({c}))
             if others:
                 others_cube = self.get_cube(others)
                 #: :type: DdNode
-                c_arena = non_det_strategy.ExistAbstract(others_cube)
+                c_arena = next_state_strategy.ExistAbstract(others_cube)
             else:
-                c_arena = non_det_strategy
-
+                c_arena = next_state_strategy
+ 
             can_be_true = c_arena.Cofactor(c)  # states (x,i) in which c can be true
             can_be_false = c_arena.Cofactor(~c)
-
+ 
             must_be_true = (~can_be_false) & can_be_true
             must_be_false = (~can_be_true) & can_be_false
-
+ 
             care_set = (must_be_true | must_be_false)
-
+ 
             c_model = must_be_true.Restrict(care_set)
-
+ 
             output_models[c] = c_model
-
-            non_det_strategy = non_det_strategy & self.make_bdd_eq(c, c_model)
-
+ 
+            next_state_strategy = next_state_strategy & self.make_bdd_eq(c, c_model)
+ 
         return output_models
+     
+#     
+#     def extract_output_funcs(self, non_det_strategy):
+#         """
+#         Calculate BDDs for output functions given a non-deterministic winning strategy.
+#         Cofactor-based approach.
+#  
+#         :return: dictionary ``controllable_variable_bdd -> func_bdd``
+#         """
+#  
+#         output_models = dict()
+#         all_outputs = list(self.out_var_bdd_)
+#         all_next_state_vars = list(self.next_state_vars_bdd_)
+#         all_next_states_and_outputs = all_outputs + all_next_state_vars
+#  
+#         #----------- output functions--------------
+#  
+#         for c in self.out_var_bdd_:
+#  
+#             others = set(set(all_outputs).difference({c}))
+#  
+#             if others:
+#                 others_cube = self.get_cube(others)
+#                 #: :type: DdNode
+#                 c_arena = non_det_strategy.ExistAbstract(others_cube)
+#             else:
+#                 c_arena = non_det_strategy
+#  
+#             can_be_true = c_arena.Cofactor(c)  # states (x,i) in which c can be true
+#             can_be_false = c_arena.Cofactor(~c)
+#  
+#             #print'can_be_true'
+#             #can_be_true.PrintMinterm()
+#             #print'can_be_false'
+#             #can_be_false.PrintMinterm()
+#             #print
+#  
+#             # We need to intersect with can_be_true to narrow the search.
+#             # Negation can cause including states from !W (with err=1)
+#             #: :type: DdNode
+#             must_be_true = (~can_be_false) & can_be_true
+#             must_be_false = (~can_be_true) & can_be_false
+#  
+#             #print "must_be_true"
+#             #must_be_true.PrintMinterm()
+#             #print "must_be_false"
+#             #must_be_false.PrintMinterm()
+#             #print
+#  
+#             care_set = (must_be_true | must_be_false)
+#              
+#             # begin compute reachable states:
+#             # reach = self.init_state_bdd_
+#             # old_reach = self.mgr_.Zero()
+#             # while reach != old_reach:
+#             #     old_reach = reach
+#             #     reach = reach | self.suc_sys_bdd(reach, non_det_strategy & self.transition_bdd_ )
+#             # care_set = care_set & reach
+#             # end compute reachable states
+#  
+#             #print'care set is'
+#             #care_set.PrintMinterm()
+#  
+#             # We use 'restrict' operation, but we could also do just:
+#             # c_model = must_be_true -> care_set
+#             # ..but this is (probably) less efficient, since we cannot set c=1 if it is not in care_set, but we could.
+#             #
+#             # Restrict on the other side applies optimizations to find smaller bdd.
+#             # It cannot be expressed using boolean logic operations since we would need to say:
+#             # must_be_true = ite(care_set, must_be_true, "don't care")
+#             # and "don't care" cannot be expressed in boolean logic.
+#  
+#             # Restrict operation:
+#             #   on care_set: must_be_true.restrict(care_set) <-> must_be_true
+#             c_model = must_be_true.Restrict(care_set)
+#  
+#             output_models[c] = c_model
+#  
+#             non_det_strategy = non_det_strategy & self.make_bdd_eq(c, c_model)
+#  
+#             #print "Strategy for output variable "
+#             #c.PrintMinterm()
+#  
+#             #print'on_set: Var is True'
+#             #c_model.PrintMinterm()
+#             #print'off_set: Var is False'
+#             #(~c_model).PrintMinterm()
+#  
+#         #----------- next state functions--------------
+#  
+#         non_det_strategy = non_det_strategy & self.transition_bdd_
+#  
+#         for c in self.next_state_vars_bdd_:
+#             others = set(set(all_next_states_and_outputs).difference({c}))
+#             if others:
+#                 others_cube = self.get_cube(others)
+#                 #: :type: DdNode
+#                 c_arena = non_det_strategy.ExistAbstract(others_cube)
+#             else:
+#                 c_arena = non_det_strategy
+#  
+#             can_be_true = c_arena.Cofactor(c)  # states (x,i) in which c can be true
+#             can_be_false = c_arena.Cofactor(~c)
+#  
+#             must_be_true = (~can_be_false) & can_be_true
+#             must_be_false = (~can_be_true) & can_be_false
+#  
+#             care_set = (must_be_true | must_be_false)
+#  
+#             c_model = must_be_true.Restrict(care_set)
+#  
+#             output_models[c] = c_model
+#  
+#             non_det_strategy = non_det_strategy & self.make_bdd_eq(c, c_model)
+#  
+#         return output_models
 
 
     def get_cube(self,variables):
@@ -605,7 +917,6 @@ class Synthesizer(object):
 
     def make_bdd_eq(self,value1, value2):
         return (value1 & value2) | (~value1 & ~value2)
-
 
     def get_all_state_bdds(self):
         states=[]

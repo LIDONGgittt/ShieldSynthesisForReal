@@ -219,15 +219,15 @@ class KStabilizingAlgo(object):
 
         #input vars consist of outputs of design and outputs of shield
         #output of design = spec outputs
-        self.sdDFA_.setInputVars(self.finalDFA_.getOutputVars())
+        self.sdDFA_.setInputVars(self.specDfa_.getOutputVars())
         for varNr in self.sdDFA_.getInputVars():
-            self.sdDFA_.setVarName(varNr, self.finalDFA_.getVarName(varNr))
+            self.sdDFA_.setVarName(varNr, self.specDfa_.getVarName(varNr))
 
         #output of shield = copies of spec outputs
-        numDesignOutVars = self.finalDFA_.getVarNum()
-        for varNr in self.finalDFA_.getOutputVars():
+        numDesignOutVars = self.specDfa_.getVarNum()
+        for varNr in self.specDfa_.getOutputVars():
             shieldVarNr = varNr + numDesignOutVars
-            shieldVarName = self.finalDFA_.getVarName(varNr) + "__1"
+            shieldVarName = self.specDfa_.getVarName(varNr) + "__1"
             self.sdDFA_.addOutputVar(shieldVarNr)
             self.sdDFA_.setVarName(shieldVarNr, shieldVarName)
 
@@ -243,7 +243,7 @@ class KStabilizingAlgo(object):
         self.sdDFA_.addNode(stateTwo, True)
 
         #no deviations (from state 1 to state 1)
-        disgnOutVars = self.finalDFA_.getOutputVars()
+        disgnOutVars = self.specDfa_.getOutputVars()
         for var in range(0, len(disgnOutVars)+1):
             for subset in combinations(disgnOutVars, var):
                 #construct label: all vars in subset are negated
@@ -251,15 +251,15 @@ class KStabilizingAlgo(object):
                 self.sdDFA_.addEdge(stateOne, stateOne, label)
 
         #deviations (from state 1 to state 2, and from state 1 to state 2)
-        for designNr in self.finalDFA_.getOutputVars():
-            shieldNr = designNr+self.finalDFA_.getVarNum()
+        for designNr in self.specDfa_.getOutputVars():
+            shieldNr = designNr+self.specDfa_.getVarNum()
             label = DfaLabel([designNr, shieldNr*-1])
             self.sdDFA_.addEdge(stateOne, stateTwo, label)
             label = DfaLabel([designNr*-1, shieldNr])
             self.sdDFA_.addEdge(stateOne, stateTwo, label)
 
         #no deviations (from state 2 to state 1)
-        disgnOutVars = self.finalDFA_.getOutputVars()
+        disgnOutVars = self.specDfa_.getOutputVars()
         for var in range(0, len(disgnOutVars)+1):
             for subset in combinations(disgnOutVars, var):
                 #construct label: all vars in subset are negated
@@ -267,8 +267,8 @@ class KStabilizingAlgo(object):
                 self.sdDFA_.addEdge(stateTwo, stateOne, label)
 
         #deviations (from state 2 to state 2, and from state 1 to state 2)
-        for designNr in self.finalDFA_.getOutputVars():
-            shieldNr = designNr+self.finalDFA_.getVarNum()
+        for designNr in self.specDfa_.getOutputVars():
+            shieldNr = designNr+self.specDfa_.getVarNum()
             label = DfaLabel([designNr, shieldNr*-1])
             self.sdDFA_.addEdge(stateTwo, stateTwo, label)
             label = DfaLabel([designNr*-1, shieldNr])
@@ -311,36 +311,36 @@ class KStabilizingAlgo(object):
     def buildShieldCorrectnessAutomaton(self):
 
         #inputs = design inputs
-        self.scDFA_.setInputVars(self.finalDFA_.getInputVars())
+        self.scDFA_.setInputVars(self.specDfa_.getInputVars())
         for varNr in self.scDFA_.getInputVars():
-            self.scDFA_.setVarName(varNr, self.finalDFA_.getVarName(varNr))
+            self.scDFA_.setVarName(varNr, self.specDfa_.getVarName(varNr))
 
         #outputs = shield outputs
-        numDesignOutVars = self.finalDFA_.getVarNum()
-        for varNr in self.finalDFA_.getOutputVars():
+        numDesignOutVars = self.specDfa_.getVarNum()
+        for varNr in self.specDfa_.getOutputVars():
             shieldVarNr = varNr + numDesignOutVars
-            sieldVarName = self.finalDFA_.getVarName(varNr) + "__1"
+            sieldVarName = self.specDfa_.getVarName(varNr) + "__1"
             self.scDFA_.addOutputVar(shieldVarNr)
             self.scDFA_.setVarName(shieldVarNr, sieldVarName)
 
         #copy nodes from spec automata
-        for sState in self.finalDFA_.getNodes():
+        for sState in self.specDfa_.getNodes():
             state = DfaNode(sState)
             if state.isFinal():
                 state.setShieldError(1)
             self.scDFA_.addNode(state, True)
 
         #copy edges from spec automata, alter label
-        for sState in self.finalDFA_.getNodes():
+        for sState in self.specDfa_.getNodes():
             for specEdge in sState.getOutgoingEdges():
                 specLabel = specEdge.getLabel()
                 #rename output variables from specLabel
-                specInLiterals = self.finalDFA_.getInputLiterals(specLabel)
-                specOutLiterals = self.finalDFA_.getOutputLiterals(specLabel)
+                specInLiterals = self.specDfa_.getInputLiterals(specLabel)
+                specOutLiterals = self.specDfa_.getOutputLiterals(specLabel)
 
                 signs = [ 1 if lit > 0 else -1 for lit in specOutLiterals]
                 specOutVars = map(abs, specOutLiterals)
-                shieldOutVars = [var + self.finalDFA_.getVarNum() for var in specOutVars]
+                shieldOutVars = [var + self.specDfa_.getVarNum() for var in specOutVars]
                 shieldOutLiterals = [sign*var for sign,var in zip(signs,shieldOutVars)]
                 
                 shieldLabel = DfaLabel(specInLiterals+shieldOutLiterals)
