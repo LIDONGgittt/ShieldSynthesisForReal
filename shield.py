@@ -251,13 +251,13 @@ USAGE
             dfa_parser = DfaParser(args.spec_file[i])
             spec_dfas.append(dfa_parser.getParsedDFA())
     else:
-        dfa_parser = DfaParser(args.spec_file[0])
-        
+        dfa_parser = DfaParser(args.spec_file[0])   
         prod_dfa = dfa_parser.getParsedDFA()
         
         for i in range(1, len(args.spec_file)):
             dfa_parser = DfaParser(args.spec_file[i])
             spec_dfa_2 = dfa_parser.getParsedDFA()
+            
             #design_dfa = spec_dfa_2 # TODO: test code
             prod_dfa = prod_dfa.buildProductOfAutomata(spec_dfa_2, True)
             prod_dfa = prod_dfa.combineUnsafeStates()
@@ -268,8 +268,7 @@ USAGE
     # build Correctness Automaton, Error Tracking Automaton and Deviation Automaton
     # and synthesize output functions for shield
 
-    iteration =0
-    
+    synthesis = Synthesizer(shield_algorithm, allowed_dev)
     #design_dfa = spec_dfas[1]
     for spec_dfa in spec_dfas:
         
@@ -278,12 +277,13 @@ USAGE
         else:
             algorithm = FiniteDesignErrorAlgo(spec_dfa, 1, allowed_dev)
             
-        synthesis = Synthesizer(shield_algorithm, allowed_dev)
+       
+  
         synthesis.synthesize_comp(algorithm.etDFA_, algorithm.sdDFA_, algorithm.scDFA_, algorithm.drDFA_)
         
         
         while not synthesis.existsWinningRegion():
-            synthesis = None    #give GC time to destroy previous manager instance
+            #synthesis = None    #give GC time to destroy previous manager instance
             allowed_dev = allowed_dev + 1
             if allowed_dev >= MAX_DEVIATIONS:
                 print "Killing because of deviation counter greater than " + str(MAX_DEVIATIONS)
@@ -295,16 +295,22 @@ USAGE
             else:
                 algorithm = FiniteDesignErrorAlgo(spec_dfa, 1, allowed_dev)
             
-            synthesis = Synthesizer(shield_algorithm, allowed_dev, algorithm.etDFA_, algorithm.sdDFA_, algorithm.scDFA_, algorithm.drDFA_)
+
+            synthesis.synthesize_comp(algorithm.etDFA_, algorithm.sdDFA_, algorithm.scDFA_, algorithm.drDFA_)
+            #synthesis = Synthesizer(shield_algorithm, allowed_dev, algorithm.etDFA_, algorithm.sdDFA_, algorithm.scDFA_, algorithm.drDFA_)
         
         # for compositional synthesis, there will be more than one spec_dfa
         # so we update design_dfa to include the property just synthesized
         design_dfa = algorithm.finalDFA_ 
+        
+        
+        
                 
         
         #create output file and verify shield
-        output_file_name = output_file_names[iteration]
-        iteration = iteration+1
+        output_file_name = output_file_names[synthesis.loop_count]
+        
+   
         
         verify = False
         result = True
@@ -372,6 +378,7 @@ USAGE
     
                 with open(output_file_name+".v", "w+") as text_file:
                     text_file.write(verilog_str)
+        synthesis.inc_loop()
 
     #print final message
     total_time = round(time.time() - t_total,2)

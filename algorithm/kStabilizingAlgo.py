@@ -30,7 +30,7 @@ class KStabilizingAlgo(object):
             dfas = designDfa.buildAutomatonWithCommonVariables(designDfa, specDfa)
             self.designDFA_ = dfas[0]
             self.specDfa_ = dfas[1]
-            
+               
             self.finalDFA_ = self.designDFA_.buildProductOfAutomata(self.specDfa_)
             self.finalDFA_ = self.finalDFA_.combineUnsafeStates()
             self.finalDFA_ = self.finalDFA_.standardization(True)

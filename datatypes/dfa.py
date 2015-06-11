@@ -19,6 +19,61 @@ class DFA(object):
     classdocs
     '''
     
+    all_input_vars_ = []
+    all_output_vars_ = []
+    
+    all_in_out_vars_ = []
+    all_var_names_ = dict()
+    
+    '''
+    Keep tracking all in out vars presented in all dfa used,
+    And unify current dfa with all other vars
+    The reasoning behind this:  
+        when use non-det strategy from last iteration
+        must make sure all var bdds is unified    
+    '''
+    def unify(self):
+        
+        unified_dfa = DFA()
+        
+        var_names = self.getVarNames().values()
+        
+        for var_name in var_names:
+            if var_name not in DFA.all_in_out_vars_:
+                DFA.all_in_out_vars_.append(var_name)
+                DFA.all_var_names_[var_name] = len(DFA.all_in_out_vars_)
+            
+        #compute joint input and output variables
+        for var_nr in self.getInputVars():
+            var_name = self.getVarName(var_nr)
+            unified_var_num = DFA.all_var_names_[var_name]
+            unified_dfa.addInputVar(unified_var_num)
+            unified_dfa.setVarName(unified_var_num, var_name)
+            
+        for var_nr in self.getOutputVars():
+            var_name = self.getVarName(var_nr)
+            unified_var_num = DFA.all_var_names_[var_name]
+            unified_dfa.addOutputVar(unified_var_num)
+            unified_dfa.setVarName(unified_var_num, var_name)          
+            
+        for node in self.getNodes():
+            u_node = DfaNode(node.getNr())
+            u_node.setInitial(node.isInitial())
+            u_node.setFinal(node.isFinal())
+            u_node.copyErrorStatus(node)
+            unified_dfa.addNode(u_node, True)            
+        
+        for node in self.getNodes():
+            for egde in node.getOutgoingEdges():
+                u_source = unified_dfa.getNode(egde.getSourceNode().getNr())
+                u_target = unified_dfa.getNode(egde.getTargetNode().getNr())
+                u_label = self.transformLabel(egde.getLabel(), self, DFA.all_var_names_)
+                unified_dfa.addEdge(u_source, u_target, u_label)          
+        return unified_dfa       
+        
+
+
+    
     #TODO: keep initial "num" values consistent with construstor passed ones. update counters on add change delete modifications of the DFA.
 
     def __init__(self, numStates=0, numVI=0, numVO=0, numInitial=0, numFinal=0, numEdges=0):
@@ -313,6 +368,18 @@ class DFA(object):
                 resTarget = resDFA.getNode(inputEdge.getTargetNode().getNr())
                 resDFA.addEdge(resSource, resTarget, inputEdge.getLabel())
         return resDFA
+
+
+
+
+
+
+
+
+
+
+
+
 
     '''
     Removes all redundant edges from dfa.

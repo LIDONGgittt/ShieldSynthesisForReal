@@ -39,33 +39,37 @@ class Synthesizer(object):
         self.num_shield_deviations_ = num_shield_deviations
         self.allowed_design_error_ = 1
 
-
+        self.loop_count = 0
 
         self.input_vars_ = []
         self.output_vars_ = []
         self.in_out_var_names_ = dict()
-        self.num_of_bits_ = 0
+        
         self.var_names_ = [] #list of all state bits, input and output variabes
 
         self.state_offsets_ = dict()
         self.var_bdds_ = dict()
 
-        self.init_state_bdd_ = self.mgr_.One()
-        self.transition_bdd_ = self.mgr_.One()
-        self.err_state_bdd_ = self.mgr_.Zero()
-        self.win_region_ = self.mgr_.Zero()
 
+        
+        self.partial_strategy = self.mgr_.One()
 
+    def inc_loop(self):
+        self.loop_count += 1  # synthesis loop increase by 1
 
     def synthesize_comp(self, error_tracking_dfa, deviation_dfa, correctness_dfa, relax_dfa):
    
    
+        self.init_state_bdd_ = self.mgr_.One()
+        self.transition_bdd_ = self.mgr_.One()
+        self.err_state_bdd_ = self.mgr_.Zero()
+        self.win_region_ = self.mgr_.Zero()
         
-        self.error_tracking_dfa_ = error_tracking_dfa
-        self.deviation_dfa_ = deviation_dfa
-        self.correctness_dfa_ = correctness_dfa
-        self.relax_dfa_ = relax_dfa
-        
+        self.error_tracking_dfa_ = error_tracking_dfa.unify()
+        self.deviation_dfa_ = deviation_dfa.unify()
+        self.correctness_dfa_ = correctness_dfa.unify()
+        self.relax_dfa_ = relax_dfa.unify()
+                
         self.dfa_list_ = [self.error_tracking_dfa_, self.deviation_dfa_, self.correctness_dfa_]
         
         self.comp_dfa_list_0 = [self.correctness_dfa_]
@@ -74,15 +78,16 @@ class Synthesizer(object):
         
         self.tmp_count_= 1
         self.result_model_ = ""
+        self.num_of_bits_ = 0
 
         if len(self.relax_dfa_.getNodes())>0:
             self.dfa_list_.append(self.relax_dfa_)
-            self.comp_dfa_list_0.append(self.relax_dfa_)
-            self.comp_dfa_list_1.append(self.relax_dfa_)
+            #self.comp_dfa_list_1.append(self.relax_dfa_)
             
             
 
         # 1. calc non-determistic strategy from scDFA and drDFA
+        # TODO: in fact, etDFA and sdDFA cover all new vars to be added,
         self.new_var_names_ = dict()
         for dfa in self.dfa_list_:
             #add input vars
@@ -105,14 +110,14 @@ class Synthesizer(object):
         # (create state bdds for all state bits of all automata)
         state_order= self.encode_states()
 
-        self.create_init_states_comp0()
+        self.create_init_states(self.comp_dfa_list_0)
         #encode variables
-        var_order = self.encode_variables()
+        var_order = self.encode_new_variables()
 
         #build next state vars
         self.next_state_vars_bdd_ = []
         for state_pos in range(0,self.num_of_bits_):
-            self.next_state_vars_bdd_.append(self.var_bdds_['s'+str(self.num_of_bits_-1-state_pos)+'n'])
+            self.next_state_vars_bdd_.append(self.var_bdds_['s'+str(self.num_of_bits_-1-state_pos)+'n'+'_'+str(self.loop_count)])
 
         #build input variables bdds
         self.in_var_bdds_ = []
@@ -152,8 +157,9 @@ class Synthesizer(object):
                
             non_det_strategy_comp0 = self.mgr_.Zero()
             print 'cannot find wining region for scDFA+drDFA!'
+            return
 
-
+        self.partial_strategy &= non_det_strategy_comp0
 
         # 2. calc non-determistic strategy from etDFA, sdDFA and drDFA
 
@@ -163,7 +169,7 @@ class Synthesizer(object):
         self.win_region_ = self.mgr_.Zero()
         
         
-        self.create_init_states_comp1()
+        self.create_init_states(self.comp_dfa_list_1)
 
         transition_bdds = []
         for dfa in self.comp_dfa_list_1:
@@ -190,9 +196,13 @@ class Synthesizer(object):
         else:
             non_det_strategy_comp1 = self.mgr_.Zero()
             print 'cannot find wining region for scDFA+drDFA!'
+            return
 
-
-        non_det_strategy = non_det_strategy_comp0 & non_det_strategy_comp1
+        self.create_relax_states()
+        
+        non_det_strategy = self.partial_strategy & non_det_strategy_comp1 
+        
+        non_det_strategy += (self.encode_transitions(self.relax_dfa_) & self.relax_state_bdd_)
         self.func_by_var_ = self.extract_output_funcs(non_det_strategy)
             
 
@@ -202,7 +212,7 @@ class Synthesizer(object):
         for dfa in self.dfa_list_:
             #add input vars
             for input_var in dfa.getInputVars():
-                if input_var not in self.input_vars_:
+                if input_var not in self.input_vars_:                                            
                     self.input_vars_.append(input_var)
                     self.in_out_var_names_[input_var]= dfa.getVarName(input_var)
 
@@ -227,7 +237,7 @@ class Synthesizer(object):
         #build next state vars
         self.next_state_vars_bdd_ = []
         for state_pos in range(0,self.num_of_bits_):
-            self.next_state_vars_bdd_.append(self.var_bdds_['s'+str(self.num_of_bits_-1-state_pos)+'n'])
+            self.next_state_vars_bdd_.append(self.var_bdds_['s'+str(self.num_of_bits_-1-state_pos)+'n']+'_'+str(self.loop_count))
 
         #build input variables bdds
         self.in_var_bdds_ = []
@@ -284,7 +294,7 @@ class Synthesizer(object):
 
         #encode next state function bdd in verilog or smv
         for state_pos in range(0,self.num_of_bits_):
-            state_name = 's'+str(self.num_of_bits_-1-state_pos)+'n'
+            state_name = 's'+str(self.num_of_bits_-1-state_pos)+'n'+'_'+str(self.loop_count)
             state_bdd = self.var_bdds_[state_name]
             self.model_to_output_format(state_name, state_bdd, self.func_by_var_[state_bdd], out_format)
 
@@ -302,43 +312,26 @@ class Synthesizer(object):
         else:
             return False
 
-    def create_init_states_comp0(self):
-        #create initial state bdd
-        
-        init_state_cor = self.correctness_dfa_.getInitialNodes()[0]
-        self.init_state_bdd_ &= self.make_node_state_bdd(init_state_cor.getNr()-1, self.correctness_dfa_)
-
-        if len(self.relax_dfa_.getNodes())>0:
-            init_state_rel = self.relax_dfa_.getInitialNodes()[0]
-            self.init_state_bdd_ &= self.make_node_state_bdd(init_state_rel.getNr()-1, self.relax_dfa_)
-
-    def create_init_states_comp1(self):
-        #create initial state bdd
-        
-        init_state_et = self.error_tracking_dfa_.getInitialNodes()[0]
-        self.init_state_bdd_ &= self.make_node_state_bdd(init_state_et.getNr()-1, self.error_tracking_dfa_)
-
-        init_state_dev = self.deviation_dfa_.getInitialNodes()[0]
-        self.init_state_bdd_ &= self.make_node_state_bdd(init_state_dev.getNr()-1, self.deviation_dfa_)
-
-        if len(self.relax_dfa_.getNodes())>0:
-            init_state_rel = self.relax_dfa_.getInitialNodes()[0]
-            self.init_state_bdd_ &= self.make_node_state_bdd(init_state_rel.getNr()-1, self.relax_dfa_)
-            
-    def create_init_states(self):
-        #create initial state bdd
-        init_state_et = self.error_tracking_dfa_.getInitialNodes()[0]
-        self.init_state_bdd_ &= self.make_node_state_bdd(init_state_et.getNr()-1, self.error_tracking_dfa_)
-
-        init_state_dev = self.deviation_dfa_.getInitialNodes()[0]
-        self.init_state_bdd_ &= self.make_node_state_bdd(init_state_dev.getNr()-1, self.deviation_dfa_)
-
-        init_state_cor = self.correctness_dfa_.getInitialNodes()[0]
-        self.init_state_bdd_ &= self.make_node_state_bdd(init_state_cor.getNr()-1, self.correctness_dfa_)
-
-        if len(self.relax_dfa_.getNodes())>0:
-            init_state_rel = self.relax_dfa_.getInitialNodes()[0]
-            self.init_state_bdd_ &= self.make_node_state_bdd(init_state_rel.getNr()-1, self.relax_dfa_)
+    def create_init_states(self, dfa_list):
+    
+        for dfa in dfa_list:
+            init_state = dfa.getInitialNodes()[0] 
+            self.init_state_bdd_ &= self.make_node_state_bdd(init_state.getNr()-1, dfa)
+     
+#     def create_init_states(self):
+#         #create initial state bdd
+#         init_state_et = self.error_tracking_dfa_.getInitialNodes()[0]
+#         self.init_state_bdd_ &= self.make_node_state_bdd(init_state_et.getNr()-1, self.error_tracking_dfa_)
+# 
+#         init_state_dev = self.deviation_dfa_.getInitialNodes()[0]
+#         self.init_state_bdd_ &= self.make_node_state_bdd(init_state_dev.getNr()-1, self.deviation_dfa_)
+# 
+#         init_state_cor = self.correctness_dfa_.getInitialNodes()[0]
+#         self.init_state_bdd_ &= self.make_node_state_bdd(init_state_cor.getNr()-1, self.correctness_dfa_)
+# 
+#         if len(self.relax_dfa_.getNodes())>0:
+#             init_state_rel = self.relax_dfa_.getInitialNodes()[0]
+#             self.init_state_bdd_ &= self.make_node_state_bdd(init_state_rel.getNr()-1, self.relax_dfa_)
 
 
     def encode_states(self):
@@ -357,18 +350,20 @@ class Synthesizer(object):
             self.state_offsets_[self.dfa_list_[i]]=offset
 
         state_order=""
-
+        
+        
+        self.state_index = len(self.var_bdds_)
         #create var bdds
         for state_pos in range(0, self.num_of_bits_):
             node_bdd = self.mgr_.IthVar(len(self.var_bdds_))
-            state_name = 's'+str(self.num_of_bits_-1-state_pos)
+            state_name = 's'+str(self.num_of_bits_-1-state_pos)+'_'+str(self.loop_count)
             self.var_names_.append(state_name)
             self.var_bdds_[state_name]=node_bdd
             state_order += state_name + " "
 
         for state_pos in range(0, self.num_of_bits_):
             node_bdd = self.mgr_.IthVar(len(self.var_bdds_))
-            state_name = 's'+str(self.num_of_bits_-1-state_pos)+'n'
+            state_name = 's'+str(self.num_of_bits_-1-state_pos)+'n'+'_'+str(self.loop_count)
             self.var_names_.append(state_name)
             self.var_bdds_[state_name]=node_bdd
             state_order += state_name + " "
@@ -381,9 +376,9 @@ class Synthesizer(object):
 
     def encode_new_variables(self):
         var_order=""
-        for var in self.new_in_out_var_names_:
+        for var in self.new_var_names_:
             var_num = var-1
-            var_name = self.new_in_out_var_names_[var]
+            var_name = self.new_var_names_[var]
             var_order += var_name+" "
             self.var_names_.append(var_name)
             node_bdd = self.mgr_.IthVar(len(self.var_bdds_))
@@ -454,19 +449,11 @@ class Synthesizer(object):
         #Rules for error states:
         #1. Correctness: A state is unsafe, if shieldError_ is true
         error_bdd_1 = self.mgr_.Zero()
-        if len(self.relax_dfa_.getNodes())>0:
-            for state in self.correctness_dfa_.getNodes():
-                for rel_state in self.relax_dfa_.getNodes():
-                    if state.getShieldError():
-                        if rel_state.getRelaxError() == 0:
-                            error_state_bdd_1 = self.make_node_state_bdd(state.getNr()-1, self.correctness_dfa_)
-                            error_state_bdd_2 = self.make_node_state_bdd(rel_state.getNr()-1, self.relax_dfa_)
-                            error_bdd_1 += (error_state_bdd_1 & error_state_bdd_2)
-        else:
-            for state in self.correctness_dfa_.getNodes():
-                if state.getShieldError():
-                    error_state_bdd = self.make_node_state_bdd(state.getNr()-1, self.correctness_dfa_)
-                    error_bdd_1 += error_state_bdd
+
+        for state in self.correctness_dfa_.getNodes():
+            if state.getShieldError():
+                error_state_bdd = self.make_node_state_bdd(state.getNr()-1, self.correctness_dfa_)
+                error_bdd_1 += error_state_bdd
         #print "ERROR BDD 1. Correctness: A state is unsafe, if shieldError_ is true"
         #error_bdd_1.PrintMinterm()
         #print "=============="
@@ -480,30 +467,30 @@ class Synthesizer(object):
         #2. No shield-deviation before system error:
         error_bdd_2 = self.mgr_.Zero()
         
-        if len(self.relax_dfa_.getNodes())>0:
-            for dev_state in self.deviation_dfa_.getNodes():
-                for et_state in self.error_tracking_dfa_.getNodes():
-                    for rel_state in self.relax_dfa_.getNodes():
-                        if dev_state.getShieldDeviation()>0:
-                            if et_state.getDesignError()==0:
-                                if rel_state.getRelaxError() == 0:
-                                    err_state_bdd_1 = self.make_node_state_bdd(dev_state.getNr()-1, self.deviation_dfa_)
-                                    err_state_bdd_2 = self.make_node_state_bdd(et_state.getNr()-1, self.error_tracking_dfa_)
-                                    err_state_bdd_3 = self.make_node_state_bdd(rel_state.getNr()-1, self.relax_dfa_)
-                                    err_state_bdd = err_state_bdd_1
-                                    err_state_bdd &= err_state_bdd_2
-                                    err_state_bdd &= err_state_bdd_3
-                                    error_bdd_2 += err_state_bdd
-        else:
-            for dev_state in self.deviation_dfa_.getNodes():
-                for et_state in self.error_tracking_dfa_.getNodes():
-                    if dev_state.getShieldDeviation()>0:
-                        if et_state.getDesignError()==0:
-                            err_state_bdd_1 = self.make_node_state_bdd(dev_state.getNr()-1, self.deviation_dfa_)
-                            err_state_bdd_2 = self.make_node_state_bdd(et_state.getNr()-1, self.error_tracking_dfa_)
-                            err_state_bdd = err_state_bdd_1
-                            err_state_bdd &= err_state_bdd_2
-                            error_bdd_2 += err_state_bdd
+#         if len(self.relax_dfa_.getNodes())>0:
+#             for dev_state in self.deviation_dfa_.getNodes():
+#                 for et_state in self.error_tracking_dfa_.getNodes():
+#                     for rel_state in self.relax_dfa_.getNodes():
+#                         if dev_state.getShieldDeviation()>0:
+#                             if et_state.getDesignError()==0:
+#                                 if rel_state.getRelaxError() == 0:
+#                                     err_state_bdd_1 = self.make_node_state_bdd(dev_state.getNr()-1, self.deviation_dfa_)
+#                                     err_state_bdd_2 = self.make_node_state_bdd(et_state.getNr()-1, self.error_tracking_dfa_)
+#                                     err_state_bdd_3 = self.make_node_state_bdd(rel_state.getNr()-1, self.relax_dfa_)
+#                                     err_state_bdd = err_state_bdd_1
+#                                     err_state_bdd &= err_state_bdd_2
+#                                     err_state_bdd &= err_state_bdd_3
+#                                     error_bdd_2 += err_state_bdd
+#         else:
+        for dev_state in self.deviation_dfa_.getNodes():
+            for et_state in self.error_tracking_dfa_.getNodes():
+                if dev_state.getShieldDeviation()>0:
+                    if et_state.getDesignError()==0:
+                        err_state_bdd_1 = self.make_node_state_bdd(dev_state.getNr()-1, self.deviation_dfa_)
+                        err_state_bdd_2 = self.make_node_state_bdd(et_state.getNr()-1, self.error_tracking_dfa_)
+                        err_state_bdd = err_state_bdd_1
+                        err_state_bdd &= err_state_bdd_2
+                        error_bdd_2 += err_state_bdd
         #print "ERROR BDD 1. Correctness: A state is unsafe, if shieldError_ is true"
         #error_bdd_1.PrintMinterm()
         #print "=============="
@@ -921,7 +908,7 @@ class Synthesizer(object):
     def get_all_state_bdds(self):
         states=[]
         for i in range(0,self.num_of_bits_):
-            states.append(self.var_bdds_["s"+str(i)])
+            states.append(self.var_bdds_["s"+str(i)+'_'+str(self.loop_count)])
         return states
 
     def prime_states(self,unprimed_states):
@@ -939,7 +926,7 @@ class Synthesizer(object):
             lit = l_bdd.NodeReadIndex()
 
             #range of current state bits, is moved by len of state field
-            if 0 <= lit < self.num_of_bits_:
+            if self.state_index <= lit < self.state_index+self.num_of_bits_:
                 new_l_bdd = self.mgr_.IthVar(lit+self.num_of_bits_)
             else:
                 new_l_bdd = l_bdd
@@ -964,9 +951,9 @@ class Synthesizer(object):
             if i >= offset and i < offset + num_bits:
                 sign = bin_str[len(bin_str)-j] #sign of s
                 if int(sign)==1:
-                    result &= self.var_bdds_["s"+str(i)] #bdd of s
+                    result &= self.var_bdds_["s"+str(i)+'_'+str(self.loop_count)] #bdd of s
                 elif int(sign)==0:
-                    result &= ~self.var_bdds_["s"+str(i)]
+                    result &= ~self.var_bdds_["s"+str(i)+'_'+str(self.loop_count)]
                 j=j+1
 
         return result
@@ -985,9 +972,9 @@ class Synthesizer(object):
             if i >= offset and i < offset + num_bits:
                 sign = bin_str[len(bin_str)-j] #sign of s
                 if int(sign)==1:
-                    result &= self.var_bdds_["s"+str(i)+"n"] #bdd of s
+                    result &= self.var_bdds_["s"+str(i)+"n"+'_'+str(self.loop_count)] #bdd of s
                 elif int(sign)==0:
-                    result &= ~self.var_bdds_["s"+str(i)+"n"]
+                    result &= ~self.var_bdds_["s"+str(i)+"n"+'_'+str(self.loop_count)]
                 j=j+1
         return result
 
