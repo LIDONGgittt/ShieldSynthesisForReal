@@ -1,4 +1,11 @@
-__author__ = 'bkoenighofer'
+'''
+Created on Jun 10, 2014
+
+@author: bkoenighofer
+
+@change: 2016/06/11 by mengwu@vt.edu 
+         try to synthesis shields by for each property instead of a composed property, make use of previous properties to relax current shield
+'''
 
 from datatypes.dfanode import DfaNode
 from datatypes.dfa import DFA

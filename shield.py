@@ -14,6 +14,9 @@ It defines classes_and_methods
 @license:    license
 
 @contact:    bettina.koennighofer@iaik.tugraz.at, robert.koenighofer@iaik.tugraz.at
+
+@change: 2015/06/11 by mengwu@vt.edu
+         implement of our new idea to compositionally synthesis the shield
 '''
 
 import sys
@@ -268,7 +271,7 @@ USAGE
     # build Correctness Automaton, Error Tracking Automaton and Deviation Automaton
     # and synthesize output functions for shield
 
-    synthesis = Synthesizer(shield_algorithm, allowed_dev)
+    synthesis = Synthesizer(shield_algorithm, allowed_dev, compostional_shield)
     #design_dfa = spec_dfas[1]
     for spec_dfa in spec_dfas:
         

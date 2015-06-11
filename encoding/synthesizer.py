@@ -2,6 +2,10 @@
 Created on Jun 10, 2014
 
 @author: bkoenighofer
+
+@change: 2016/06/11 by mengwu@vt.edu 
+         1. try to synthesis shields by for each property instead of a composed property, make use of previous properties to relax current shield
+         2. re-use former non-deterministic strategy: we found safety game strategy is compositional
 '''
 
  # -*- coding: utf-8 -*-
@@ -28,7 +32,7 @@ class Synthesizer(object):
     these properties, so they can be used to relax the synthesis.  
     '''
 
-    def __init__(self, algorithm, num_shield_deviations):
+    def __init__(self, algorithm, num_shield_deviations, compostional):
         #print ("======================================\n synthesis  \n======================================\n")
         #init pycudd
         self.mgr_ = pycudd.DdManager()
@@ -50,13 +54,21 @@ class Synthesizer(object):
         self.state_offsets_ = dict()
         self.var_bdds_ = dict()
 
-
+        self.isComp = compostional
         
         self.partial_strategy = self.mgr_.One()
 
     def inc_loop(self):
         self.loop_count += 1  # synthesis loop increase by 1
-
+    
+    def synthesize(self, error_tracking_dfa, deviation_dfa, correctness_dfa, relax_dfa):
+        
+        if self.isComp:
+            self.synthesize_comp(self, error_tracking_dfa, deviation_dfa, correctness_dfa, relax_dfa)
+        else:
+            self.synthesize_non_comp(self, error_tracking_dfa, deviation_dfa, correctness_dfa, relax_dfa)
+    
+    
     def synthesize_comp(self, error_tracking_dfa, deviation_dfa, correctness_dfa, relax_dfa):
    
    
@@ -206,8 +218,21 @@ class Synthesizer(object):
         self.func_by_var_ = self.extract_output_funcs(non_det_strategy)
             
 
-    def synthesize(self):
+    def synthesize_non_comp(self, error_tracking_dfa, deviation_dfa, correctness_dfa, relax_dfa):
 
+        self.init_state_bdd_ = self.mgr_.One()
+        self.transition_bdd_ = self.mgr_.One()
+        self.err_state_bdd_ = self.mgr_.Zero()
+        self.win_region_ = self.mgr_.Zero()
+        
+        self.tmp_count_= 1
+        self.result_model_ = ""
+        self.num_of_bits_ = 0
+                        
+        self.dfa_list_ = [self.error_tracking_dfa_, self.deviation_dfa_, self.correctness_dfa_]
+        if len(self.relax_dfa_.getNodes())>0:
+            self.dfa_list_.append(self.relax_dfa_)
+        
         #compute set joint input variables and output variables
         for dfa in self.dfa_list_:
             #add input vars
@@ -230,7 +255,7 @@ class Synthesizer(object):
 
         state_order= self.encode_states()
 
-        self.create_init_states()
+        self.create_init_states(self.dfa_list_)
         #encode variables
         var_order = self.encode_variables()
 
@@ -387,9 +412,9 @@ class Synthesizer(object):
     
     def encode_variables(self):
         var_order=""
-        for var in self.new_var_names_:
+        for var in self.in_out_var_names_:
             var_num = var-1
-            var_name = self.new_var_names_[var]
+            var_name = self.in_out_var_names_[var]
             var_order += var_name+" "
             self.var_names_.append(var_name)
             node_bdd = self.mgr_.IthVar(len(self.var_bdds_))
