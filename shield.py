@@ -89,7 +89,8 @@ def main(argv=None): # IGNORE:C0111
 USAGE
 ''' % (program_shortdesc, str(__date__))
 
-    t_total = time.time()
+    t_total  = time.time()
+    automata_time = t_total
 
     try:
         # Setup argument parser
@@ -184,24 +185,20 @@ USAGE
             encoding = VERILOG
 
         #output file name is a combination of all input file names
-        output_file_names =[]
+        output_file_name = ''
         if compostional_shield:
-            for input_file in spec_files:
-                output_file_name="output/comp/c_"
-                input_file_name = input_file.split("/")
-                input_file_name = input_file_name[len(input_file_name)-1]
-                input_file_name = input_file_name.split(".")[0]
-                output_file_name+=input_file_name
-                output_file_names.append(output_file_name) 
+            output_file_name="output/imp/c_"
         else:
-            output_file_name="output/comp/"
-            for input_file in spec_files:
-                input_file_name = input_file.split("/")
-                input_file_name = input_file_name[len(input_file_name)-1]
-                input_file_name = input_file_name.split(".")[0]
-                output_file_name+=input_file_name+"_"
-            output_file_name = output_file_name[:-1]  
-            output_file_names.append(output_file_name)     
+            output_file_name="output/imp/"   
+            
+        for input_file in spec_files:
+            input_file_name = input_file.split("/")
+            input_file_name = input_file_name[len(input_file_name)-1]
+            input_file_name = input_file_name.split(".")[0]
+            output_file_name+=input_file_name+"_"
+        output_file_name = output_file_name[:-1]  
+        
+    
 
     except KeyboardInterrupt:
         ### handle keyboard interrupt ###
@@ -249,29 +246,24 @@ USAGE
     #build specification DFA
     spec_dfas=[]
     
-    if compostional_shield:
-        for i in range(0, len(args.spec_file)):
-            dfa_parser = DfaParser(args.spec_file[i])
-            spec_dfas.append(dfa_parser.getParsedDFA())
-    else:
-        dfa_parser = DfaParser(args.spec_file[0])   
-        prod_dfa = dfa_parser.getParsedDFA()
+    dfa_parser = DfaParser(args.spec_file[0])   
+    prod_dfa = dfa_parser.getParsedDFA()
+    
+    for i in range(1, len(args.spec_file)):
+        dfa_parser = DfaParser(args.spec_file[i])
+        spec_dfa_2 = dfa_parser.getParsedDFA()
         
-        for i in range(1, len(args.spec_file)):
-            dfa_parser = DfaParser(args.spec_file[i])
-            spec_dfa_2 = dfa_parser.getParsedDFA()
-            
-            #design_dfa = spec_dfa_2 # TODO: test code
-            prod_dfa = prod_dfa.buildProductOfAutomata(spec_dfa_2, True)
-            prod_dfa = prod_dfa.combineUnsafeStates()
-            prod_dfa = prod_dfa.standardization(True)
-        spec_dfas.append(prod_dfa)
+        #design_dfa = spec_dfa_2 # TODO: test code
+        prod_dfa = prod_dfa.buildProductOfAutomata(spec_dfa_2, True)
+        prod_dfa = prod_dfa.combineUnsafeStates()
+        prod_dfa = prod_dfa.standardization(True)
+    spec_dfas.append(prod_dfa)
 
 
     # build Correctness Automaton, Error Tracking Automaton and Deviation Automaton
     # and synthesize output functions for shield
 
-    synthesis = Synthesizer(shield_algorithm, allowed_dev, compostional_shield)
+ 
     #design_dfa = spec_dfas[1]
     for spec_dfa in spec_dfas:
         
@@ -280,9 +272,10 @@ USAGE
         else:
             algorithm = FiniteDesignErrorAlgo(spec_dfa, 1, allowed_dev)
             
+        automata_time = round(time.time() - t_total,2)
        
-  
-        synthesis.synthesize_comp(algorithm.etDFA_, algorithm.sdDFA_, algorithm.scDFA_, algorithm.drDFA_)
+        synthesis = Synthesizer(shield_algorithm, allowed_dev, compostional_shield)
+        synthesis.synthesize(algorithm.etDFA_, algorithm.sdDFA_, algorithm.scDFA_)
         
         
         while not synthesis.existsWinningRegion():
@@ -297,9 +290,9 @@ USAGE
                 algorithm = KStabilizingAlgo(spec_dfa, design_dfa, allowed_dev)
             else:
                 algorithm = FiniteDesignErrorAlgo(spec_dfa, 1, allowed_dev)
-            
-
-            synthesis.synthesize_comp(algorithm.etDFA_, algorithm.sdDFA_, algorithm.scDFA_, algorithm.drDFA_)
+            del synthesis
+            synthesis = Synthesizer(shield_algorithm, allowed_dev, compostional_shield)
+            synthesis.synthesize(algorithm.etDFA_, algorithm.sdDFA_, algorithm.scDFA_)
             #synthesis = Synthesizer(shield_algorithm, allowed_dev, algorithm.etDFA_, algorithm.sdDFA_, algorithm.scDFA_, algorithm.drDFA_)
         
         # for compositional synthesis, there will be more than one spec_dfa
@@ -311,7 +304,6 @@ USAGE
                 
         
         #create output file and verify shield
-        output_file_name = output_file_names[synthesis.loop_count]
         
    
         
@@ -386,7 +378,6 @@ USAGE
     #print final message
     total_time = round(time.time() - t_total,2)
 
-
     print("******************************************")
     print("*** Final Spec Automaton:        ***")
     print("**** num states: " + str(spec_dfa.getNodeNum()) + "        ***")
@@ -396,6 +387,7 @@ USAGE
     if verify:
         print("*** Time for synthesis: " + str(total_time-verify_time) + "       ***")
         print("*** Time for verification: " + str(verify_time) + "       ***")
+    print("*** Automaton Construction time: " + str(automata_time) + "        ***")
     print("*** Total execution time: " + str(total_time) + "        ***")
     print("******************************************")
 
