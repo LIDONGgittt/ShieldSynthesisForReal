@@ -246,148 +246,149 @@ USAGE
     #build specification DFA
     spec_dfas=[]
     
-    dfa_parser = DfaParser(args.spec_file[0])   
-    prod_dfa = dfa_parser.getParsedDFA()
-    
-    for i in range(1, len(args.spec_file)):
-        dfa_parser = DfaParser(args.spec_file[i])
-        spec_dfa_2 = dfa_parser.getParsedDFA()
+    if compostional_shield:
+        for i in range(0, len(args.spec_file)):
+            dfa_parser = DfaParser(args.spec_file[i])
+            spec_dfas.append(dfa_parser.getParsedDFA())
+    else:
+        dfa_parser = DfaParser(args.spec_file[0])   
+        prod_dfa = dfa_parser.getParsedDFA()
         
-        #design_dfa = spec_dfa_2 # TODO: test code
-        prod_dfa = prod_dfa.buildProductOfAutomata(spec_dfa_2, True)
-        prod_dfa = prod_dfa.combineUnsafeStates()
-        prod_dfa = prod_dfa.standardization(True)
-    spec_dfas.append(prod_dfa)
-
+        for i in range(1, len(args.spec_file)):
+            dfa_parser = DfaParser(args.spec_file[i])
+            spec_dfa_2 = dfa_parser.getParsedDFA()
+            
+            #design_dfa = spec_dfa_2 # TODO: test code
+            prod_dfa = prod_dfa.buildProductOfAutomata(spec_dfa_2, True)
+            prod_dfa = prod_dfa.combineUnsafeStates()
+            prod_dfa = prod_dfa.standardization(True)
+        spec_dfas.append(prod_dfa)
+    
 
     # build Correctness Automaton, Error Tracking Automaton and Deviation Automaton
     # and synthesize output functions for shield
 
- 
-    #design_dfa = spec_dfas[1]
-    for spec_dfa in spec_dfas:
+    if shield_algorithm == K_STABILIZING_ALGORITHM:
+        algorithm = KStabilizingAlgo(spec_dfas, allowed_dev)
+    else:
+        print 'This version does not support Finite Design Error algorithm'
+        return
+        #algorithm = FiniteDesignErrorAlgo(spec_dfas[0], 1, allowed_dev)
         
-        if shield_algorithm == K_STABILIZING_ALGORITHM:
-            algorithm = KStabilizingAlgo(spec_dfa, design_dfa, allowed_dev)
-        else:
-            algorithm = FiniteDesignErrorAlgo(spec_dfa, 1, allowed_dev)
-            
-        automata_time = round(time.time() - t_total,2)
-       
+    automata_time = round(time.time() - t_total,2)
+    print("*** Automaton Construction time: " + str(automata_time) + "        ***")
+
+    synthesis = Synthesizer(shield_algorithm, allowed_dev, compostional_shield)
+    synthesis.synthesize(algorithm.etDFAs_, algorithm.sdDFA_, algorithm.scDFA_)
+    
+    
+    while not synthesis.existsWinningRegion():
+        #synthesis = None    #give GC time to destroy previous manager instance
+        allowed_dev = allowed_dev + 1
+        if allowed_dev >= MAX_DEVIATIONS:
+            print "Killing because of deviation counter greater than " + str(MAX_DEVIATIONS)
+            sys.exit(99)
+        print("allowed_dev=" + str(allowed_dev))
+
+        algorithm = KStabilizingAlgo(spec_dfas, allowed_dev)
+        
+        del synthesis
         synthesis = Synthesizer(shield_algorithm, allowed_dev, compostional_shield)
-        synthesis.synthesize(algorithm.etDFA_, algorithm.sdDFA_, algorithm.scDFA_)
-        
-        
-        while not synthesis.existsWinningRegion():
-            #synthesis = None    #give GC time to destroy previous manager instance
-            allowed_dev = allowed_dev + 1
-            if allowed_dev >= MAX_DEVIATIONS:
-                print "Killing because of deviation counter greater than " + str(MAX_DEVIATIONS)
-                sys.exit(99)
-            print("allowed_dev=" + str(allowed_dev))
+        synthesis.synthesize(algorithm.etDFAs_, algorithm.sdDFA_, algorithm.scDFA_)
+        #synthesis = Synthesizer(shield_algorithm, allowed_dev, algorithm.etDFA_, algorithm.sdDFA_, algorithm.scDFA_, algorithm.drDFA_)
     
-            if shield_algorithm == K_STABILIZING_ALGORITHM:
-                algorithm = KStabilizingAlgo(spec_dfa, design_dfa, allowed_dev)
-            else:
-                algorithm = FiniteDesignErrorAlgo(spec_dfa, 1, allowed_dev)
-            del synthesis
-            synthesis = Synthesizer(shield_algorithm, allowed_dev, compostional_shield)
-            synthesis.synthesize(algorithm.etDFA_, algorithm.sdDFA_, algorithm.scDFA_)
-            #synthesis = Synthesizer(shield_algorithm, allowed_dev, algorithm.etDFA_, algorithm.sdDFA_, algorithm.scDFA_, algorithm.drDFA_)
-        
-        # for compositional synthesis, there will be more than one spec_dfa
-        # so we update design_dfa to include the property just synthesized
-        design_dfa = algorithm.finalDFA_ 
-        
-        
-        
-                
-        
-        #create output file and verify shield
-        
-   
-        
-        verify = False
-        result = True
-        t_verify = 0
-        verify_time = 0
-        if encoding == SMV:
-            if design_present:
-                #Outputfile of the Shield module, the Design module and a Main Module connecting both of them
-                #Afterwards, verification with SMV
-                verify = True
-                correctness_dfa = spec_dfa.createVerificationDfa()
-                deviation_dfa= algorithm.sdDFA_.createVerificationDfa()
+    # for compositional synthesis, there will be more than one spec_dfa
+    # so we update design_dfa to include the property just synthesized
+    final_dfa = algorithm.finalDFA_ 
     
-                smv_encoder = SMVEncoder()
-                smv_encoder.addShieldModel(synthesis.getResultModel(encoding), synthesis.getNumOfBits())
-                smv_encoder.addDFA("design", design_dfa)
-                smv_encoder.addDFA("correctness", correctness_dfa)
-                smv_encoder.addDFA("deviation", deviation_dfa)
-                smv_encoder.addDFA("specification", spec_dfa)
-                smv_str = smv_encoder.getEncodedData()
     
-                with open(output_file_name+".smv", "w+") as text_file:
-                    text_file.write(smv_str)
     
-                t_verify = time.time()
-                smv_checker = NuSMV()
-                result = smv_checker.check(smv_str)
-                verify_time = round(time.time() - t_verify,2)
-            else:
-                #no verification, Output File contains only Shield Module
-                smv_encoder = SMVEncoder()
-                smv_encoder.addShieldModel(synthesis.getResultModel(encoding), synthesis.getNumOfBits())
-                smv_encoder.addDFA("specification", spec_dfa)
-                smv_str = smv_encoder.getEncodedData()
-                with open(output_file_name+".smv", "w+") as text_file:
-                    text_file.write(smv_str)
+            
     
-        else: #encoding = VERILOG
-            if visspec_present and design_present:
-                #Outputfile of the Shield module, the Design module and a Main Module connecting both of them
-                #Afterwards, verification with VIS
-                verify = True
-                verilog_encoder = VerilogEncoder(spec_dfa)
-                verilog_encoder.addShieldModel(synthesis.getResultModel(encoding), synthesis.getNumOfBits(), synthesis.getTmpCount())
-                verilog_encoder.addDesignModel(verilog_design_str)
-                verilog_str = verilog_encoder.getEncodedData()
+    #create output file and verify shield
     
-                with open(output_file_name+".v", "w+") as text_file:
-                    text_file.write(verilog_str)
+
     
-                t_verify = time.time()
-                vis = VIS()
-                vis.readVerilog(output_file_name+".v")
-                vis.flattenHierarchy()
-                vis.staticOrder()
-                vis.buildPartitionMdds()
-                result = vis.ltlModelCheck(vis_spec)
-                vis.quit()
-                verify_time = round(time.time() - t_verify,2)
-            else:
-                #no verification, Output File contains only Shield Module
-                verilog_encoder = VerilogEncoder(spec_dfa)
-                verilog_encoder.addShieldModel(synthesis.getResultModel(encoding), synthesis.getNumOfBits(), synthesis.getTmpCount())
-                verilog_str = verilog_encoder.getEncodedData()
-    
-                with open(output_file_name+".v", "w+") as text_file:
-                    text_file.write(verilog_str)
-        synthesis.inc_loop()
+    verify = False
+    result = True
+    t_verify = 0
+    verify_time = 0
+    if encoding == SMV:
+        if design_present:
+            #Outputfile of the Shield module, the Design module and a Main Module connecting both of them
+            #Afterwards, verification with SMV
+            verify = True
+            correctness_dfa = final_dfa.createVerificationDfa()
+            deviation_dfa= algorithm.sdDFA_.createVerificationDfa()
+
+            smv_encoder = SMVEncoder()
+            smv_encoder.addShieldModel(synthesis.getResultModel(encoding), synthesis.getNumOfBits())
+            smv_encoder.addDFA("design", design_dfa)
+            smv_encoder.addDFA("correctness", correctness_dfa)
+            smv_encoder.addDFA("deviation", deviation_dfa)
+            smv_encoder.addDFA("specification", final_dfa)
+            smv_str = smv_encoder.getEncodedData()
+
+            with open(output_file_name+".smv", "w+") as text_file:
+                text_file.write(smv_str)
+
+            t_verify = time.time()
+            smv_checker = NuSMV()
+            result = smv_checker.check(smv_str)
+            verify_time = round(time.time() - t_verify,2)
+        else:
+            #no verification, Output File contains only Shield Module
+            smv_encoder = SMVEncoder()
+            smv_encoder.addShieldModel(synthesis.getResultModel(encoding), synthesis.getNumOfBits())
+            smv_encoder.addDFA("specification", final_dfa)
+            smv_str = smv_encoder.getEncodedData()
+            with open(output_file_name+".smv", "w+") as text_file:
+                text_file.write(smv_str)
+
+    else: #encoding = VERILOG
+        if visspec_present and design_present:
+            #Outputfile of the Shield module, the Design module and a Main Module connecting both of them
+            #Afterwards, verification with VIS
+            verify = True
+            verilog_encoder = VerilogEncoder(final_dfa)
+            verilog_encoder.addShieldModel(synthesis.getResultModel(encoding), synthesis.getNumOfBits(), synthesis.getTmpCount())
+            verilog_encoder.addDesignModel(verilog_design_str)
+            verilog_str = verilog_encoder.getEncodedData()
+
+            with open(output_file_name+".v", "w+") as text_file:
+                text_file.write(verilog_str)
+
+            t_verify = time.time()
+            vis = VIS()
+            vis.readVerilog(output_file_name+".v")
+            vis.flattenHierarchy()
+            vis.staticOrder()
+            vis.buildPartitionMdds()
+            result = vis.ltlModelCheck(vis_spec)
+            vis.quit()
+            verify_time = round(time.time() - t_verify,2)
+        else:
+            #no verification, Output File contains only Shield Module
+            verilog_encoder = VerilogEncoder(final_dfa)
+            verilog_encoder.addShieldModel(synthesis.getResultModel(encoding), synthesis.getNumOfBits(), synthesis.getTmpCount())
+            verilog_str = verilog_encoder.getEncodedData()
+
+            with open(output_file_name+".v", "w+") as text_file:
+                text_file.write(verilog_str)
+    synthesis.inc_loop()
 
     #print final message
     total_time = round(time.time() - t_total,2)
 
     print("******************************************")
     print("*** Final Spec Automaton:        ***")
-    print("**** num states: " + str(spec_dfa.getNodeNum()) + "        ***")
-    print("**** num edges: " + str(spec_dfa.getNumEdges()) + "        ***")
-    print("**** num inputs: " + str(len(spec_dfa.getInputVars())) + "        ***")
-    print("**** num outputs " + str(len(spec_dfa.getOutputVars())) + "        ***")
+    print("**** num states: " + str(final_dfa.getNodeNum()) + "        ***")
+    print("**** num edges: " + str(final_dfa.getNumEdges()) + "        ***")
+    print("**** num inputs: " + str(len(final_dfa.getInputVars())) + "        ***")
+    print("**** num outputs " + str(len(final_dfa.getOutputVars())) + "        ***")
     if verify:
         print("*** Time for synthesis: " + str(total_time-verify_time) + "       ***")
         print("*** Time for verification: " + str(verify_time) + "       ***")
-    print("*** Automaton Construction time: " + str(automata_time) + "        ***")
     print("*** Total execution time: " + str(total_time) + "        ***")
     print("******************************************")
 

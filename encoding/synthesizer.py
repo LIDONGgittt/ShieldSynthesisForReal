@@ -61,14 +61,14 @@ class Synthesizer(object):
     def inc_loop(self):
         self.loop_count += 1  # synthesis loop increase by 1
     
-    def synthesize(self, error_tracking_dfa, deviation_dfa, correctness_dfa):
+    def synthesize(self, error_tracking_dfas, deviation_dfa, correctness_dfa):
         
         if self.isComp:
-            self.synthesize_comp(error_tracking_dfa, deviation_dfa, correctness_dfa)
+            self.synthesize_comp(error_tracking_dfas, deviation_dfa, correctness_dfa)
         else:
-            self.synthesize_non_comp(error_tracking_dfa, deviation_dfa, correctness_dfa)
+            self.synthesize_non_comp(error_tracking_dfas[0], deviation_dfa, correctness_dfa)
 
-    def synthesize_comp(self, error_tracking_dfa, deviation_dfa, correctness_dfa):
+    def synthesize_comp(self, error_tracking_dfas, deviation_dfa, correctness_dfa):
    
         synthe_0  = time.time()
         
@@ -77,14 +77,18 @@ class Synthesizer(object):
         self.err_state_bdd_ = self.mgr_.Zero()
         self.win_region_ = self.mgr_.Zero()
         
-        self.error_tracking_dfa_ = error_tracking_dfa.unify()
+        self.error_tracking_dfas_ = []
+        
+        for dfa in error_tracking_dfas:
+            self.error_tracking_dfas_.append(dfa.unify())
+            
         self.deviation_dfa_ = deviation_dfa.unify()
         self.correctness_dfa_ = correctness_dfa.unify()
                 
-        self.dfa_list_ = [self.error_tracking_dfa_, self.deviation_dfa_, self.correctness_dfa_]
+        self.dfa_list_ = self.error_tracking_dfas_ + [self.deviation_dfa_, self.correctness_dfa_]
         
         self.comp_dfa_list_0 = [self.correctness_dfa_]
-        self.comp_dfa_list_1 = [self.error_tracking_dfa_, self.deviation_dfa_]
+        self.comp_dfa_list_1 = self.error_tracking_dfas_ + [self.deviation_dfa_]
         
         
         self.tmp_count_= 1
@@ -115,108 +119,156 @@ class Synthesizer(object):
         # (create state bdds for all state bits of all automata)
         state_order= self.encode_states()
 
-        self.create_init_states(self.comp_dfa_list_0)
-        #encode variables
-        var_order = self.encode_new_variables()
-
-        #build next state vars
-        self.next_state_vars_bdd_ = []
-        for state_pos in range(0,self.num_of_bits_):
-            self.next_state_vars_bdd_.append(self.var_bdds_['s'+str(self.num_of_bits_-1-state_pos)+'n'])
-
-        #build input variables bdds
-        self.in_var_bdds_ = []
-        for var in self.input_vars_:
-            self.in_var_bdds_.append(self.var_bdds_["v"+str(var-1)])
-
-        #build output variables bdds
-        self.out_var_bdd_ = []
-        for var in self.output_vars_:
-            self.out_var_bdd_.append(self.var_bdds_["v"+str(var-1)])
-
-
-        transition_bdds = []
-        for dfa in self.comp_dfa_list_0:
-            transition_bdds.append(self.encode_transitions(dfa))
-
-        #encode final transition relation
-        for transition_bdd in transition_bdds:
-            self.transition_bdd_ &= transition_bdd
-
-        correctness_transition_bdd = self.transition_bdd_
         
-        self.create_error_states_comp0()
-        
-        win_region_comp0 = self.not_error_state_bdd
-        
-        
-        synthe_1 = time.time()
-        
-        print("log: 1st stage time: " + str(round(synthe_1 - synthe_0,2)))
-        #calculate winning region
-        #self.win_region_ = self.calc_winning_region()
-        #print "win_region"
-        #self.win_region_.PrintMinterm()
-
-#         if self.win_region_ != self.mgr_.Zero():
-#             #print("winning region:")
-#             #self.win_region_.PrintMinterm()
-#             
-#             win_region_comp0 = self.win_region_
-#                     
-# #             non_det_strategy_comp0 = self.get_nondet_strategy(self.win_region_)
-#             #print ("non-det-strategy")
-#             #non_det_strategy.PrintMinterm()
-#         else:
-#                
-#             win_region_comp0 = self.mgr_.Zero()
-#             print 'cannot find wining region for scDFA+drDFA!'
-#             return
-
-        
-
-        # 2. calc non-determistic strategy from etDFA, sdDFA and drDFA
-
-        self.init_state_bdd_ = self.mgr_.One()
-        self.transition_bdd_ = self.mgr_.One()
-        self.err_state_bdd_ = self.mgr_.Zero()
-        self.win_region_ = self.mgr_.Zero()
-        
-        
-        self.create_init_states(self.comp_dfa_list_1)
-
-        transition_bdds = []
-        for dfa in self.comp_dfa_list_1:
-            transition_bdds.append(self.encode_transitions(dfa))
-
-        #encode final transition relation
-        for transition_bdd in transition_bdds:
-            self.transition_bdd_ &= transition_bdd
-
-
-        self.create_error_states_comp1()
-
-
-        self.win_region_ = self.calc_winning_region()
-
-        synthe_2 = time.time()
-        print("log: 2nd stage time: " + str(round(synthe_2 - synthe_1,2)))
-        
-        if self.win_region_ != self.mgr_.Zero():
-            #print("winning region:")
-            #self.win_region_.PrintMinterm()
+        if True:
+            self.create_init_states(self.dfa_list_)
+            #encode variables
+            var_order = self.encode_variables()
+                #build next state vars
+            self.next_state_vars_bdd_ = []
+            for state_pos in range(0,self.num_of_bits_):
+                self.next_state_vars_bdd_.append(self.var_bdds_['s'+str(self.num_of_bits_-1-state_pos)+'n'])
+    
+            #build input variables bdds
+            self.in_var_bdds_ = []
+            for var in self.input_vars_:
+                self.in_var_bdds_.append(self.var_bdds_["v"+str(var-1)])
+    
+            #build output variables bdds
+            self.out_var_bdd_ = []
+            for var in self.output_vars_:
+                self.out_var_bdd_.append(self.var_bdds_["v"+str(var-1)])
+    
+    
+            transition_bdds = []
+            for dfa in self.dfa_list_:
+                transition_bdds.append(self.encode_transitions(dfa))
                 
-            self.transition_bdd_ &= correctness_transition_bdd
-            self.win_region_ &= win_region_comp0
+            #encode final transition relation
+            for transition_bdd in transition_bdds:
+                self.transition_bdd_ &= transition_bdd  
                 
+            self.create_error_states_comp0()
             
-            non_det_strategy = self.get_nondet_strategy(self.win_region_)
-            #print ("non-det-strategy")
-            #non_det_strategy.PrintMinterm()
+            error_state = self.err_state_bdd_
+            
+            self.create_error_states_comp1()
+            
+            self.err_state_bdd_ += error_state
+            
+            self.win_region_ = self.calc_winning_region()
+    
+            synthe_2 = time.time()
+            print("log: 2nd stage time: " + str(round(synthe_2 - synthe_0,2)))
+            
+            if self.win_region_ != self.mgr_.Zero():
+                #print("winning region:")
+                #self.win_region_.PrintMinterm()                
+                non_det_strategy = self.get_nondet_strategy(self.win_region_)
+            else:
+                non_det_strategy = self.mgr_.Zero()
+                print 'cannot find wining region for scDFA+drDFA!'
+                return
+        
         else:
-            non_det_strategy = self.mgr_.Zero()
-            print 'cannot find wining region for scDFA+drDFA!'
-            return
+            self.create_init_states(self.comp_dfa_list_0)
+            #encode variables
+            var_order = self.encode_new_variables()
+    
+            #build next state vars
+            self.next_state_vars_bdd_ = []
+            for state_pos in range(0,self.num_of_bits_):
+                self.next_state_vars_bdd_.append(self.var_bdds_['s'+str(self.num_of_bits_-1-state_pos)+'n'])
+    
+            #build input variables bdds
+            self.in_var_bdds_ = []
+            for var in self.input_vars_:
+                self.in_var_bdds_.append(self.var_bdds_["v"+str(var-1)])
+    
+            #build output variables bdds
+            self.out_var_bdd_ = []
+            for var in self.output_vars_:
+                self.out_var_bdd_.append(self.var_bdds_["v"+str(var-1)])
+    
+    
+            transition_bdds = []
+            for dfa in self.comp_dfa_list_0:
+                transition_bdds.append(self.encode_transitions(dfa))
+    
+            #encode final transition relation
+            for transition_bdd in transition_bdds:
+                self.transition_bdd_ &= transition_bdd
+    
+            correctness_transition_bdd = self.transition_bdd_
+            
+            self.create_error_states_comp0()
+
+            
+            synthe_1 = time.time()
+            
+            print("log: 1st stage time: " + str(round(synthe_1 - synthe_0,2)))
+            #calculate winning region
+            self.win_region_ = self.calc_winning_region()
+    
+            if self.win_region_ != self.mgr_.Zero():
+                #print("winning region:")
+                #self.win_region_.PrintMinterm()
+                 
+                win_region_comp0 = self.win_region_
+                         
+    #             non_det_strategy_comp0 = self.get_nondet_strategy(self.win_region_)
+                #print ("non-det-strategy")
+                #non_det_strategy.PrintMinterm()
+            else:
+                    
+                win_region_comp0 = self.mgr_.Zero()
+                print 'cannot find wining region for scDFA+drDFA!'
+                return
+    
+            
+    
+            # 2. calc non-determistic strategy from etDFA, sdDFA and drDFA
+    
+            self.init_state_bdd_ = self.mgr_.One()
+            self.transition_bdd_ = self.mgr_.One()
+            self.err_state_bdd_ = self.mgr_.Zero()
+            self.win_region_ = self.mgr_.Zero()
+            
+            
+            self.create_init_states(self.comp_dfa_list_1)
+    
+            transition_bdds = []
+            for dfa in self.comp_dfa_list_1:
+                transition_bdds.append(self.encode_transitions(dfa))
+    
+            #encode final transition relation
+            for transition_bdd in transition_bdds:
+                self.transition_bdd_ &= transition_bdd
+    
+    
+            self.create_error_states_comp1()
+    
+    
+            self.win_region_ = self.not_error_state_bdd
+    
+            synthe_2 = time.time()
+            print("log: 2nd stage time: " + str(round(synthe_2 - synthe_1,2)))
+            
+            if self.win_region_ != self.mgr_.Zero():
+                #print("winning region:")
+                #self.win_region_.PrintMinterm()
+                    
+                self.transition_bdd_ &= correctness_transition_bdd
+                self.win_region_ &= win_region_comp0
+                    
+                
+                non_det_strategy = self.get_nondet_strategy(self.win_region_)
+                #print ("non-det-strategy")
+                #non_det_strategy.PrintMinterm()
+            else:
+                non_det_strategy = self.mgr_.Zero()
+                print 'cannot find wining region for scDFA+drDFA!'
+                return
 
         #self.create_relax_states()
 
@@ -504,38 +556,35 @@ class Synthesizer(object):
         #Rules for error states:
         #2. No shield-deviation before system error:
         error_bdd_1 = self.mgr_.Zero()
+        error_bdd_2 = self.mgr_.One()
+        
         non_error_bdd_1 = self.mgr_.Zero()
-#         if len(self.relax_dfa_.getNodes())>0:
-#             for dev_state in self.deviation_dfa_.getNodes():
-#                 for et_state in self.error_tracking_dfa_.getNodes():
-#                     for rel_state in self.relax_dfa_.getNodes():
-#                         if dev_state.getShieldDeviation()>0:
-#                             if et_state.getDesignError()==0:
-#                                 if rel_state.getRelaxError() == 0:
-#                                     err_state_bdd_1 = self.make_node_state_bdd(dev_state.getNr()-1, self.deviation_dfa_)
-#                                     err_state_bdd_2 = self.make_node_state_bdd(et_state.getNr()-1, self.error_tracking_dfa_)
-#                                     err_state_bdd_3 = self.make_node_state_bdd(rel_state.getNr()-1, self.relax_dfa_)
-#                                     err_state_bdd = err_state_bdd_1
-#                                     err_state_bdd &= err_state_bdd_2
-#                                     err_state_bdd &= err_state_bdd_3
-#                                     error_bdd_2 += err_state_bdd
-#         else:
+        non_error_bdd_2 = self.mgr_.Zero()
+        
+        
         for dev_state in self.deviation_dfa_.getNodes():
-            for et_state in self.error_tracking_dfa_.getNodes():
-                state_bdd_1 = self.make_node_state_bdd(dev_state.getNr()-1, self.deviation_dfa_)
-                state_bdd_2 = self.make_node_state_bdd(et_state.getNr()-1, self.error_tracking_dfa_)
-                state_bdd = state_bdd_1 & state_bdd_2
-
-                if dev_state.getShieldDeviation()>0 and et_state.getDesignError()==0:
-                    error_bdd_1 += state_bdd
+            state_bdd_1 = self.make_node_state_bdd(dev_state.getNr()-1, self.deviation_dfa_)
+            if dev_state.getShieldDeviation()>0:
+                error_bdd_1 += state_bdd_1
+            else:
+                non_error_bdd_1 += state_bdd_1
+        
+        for error_tracking_dfa in self.error_tracking_dfas_:
+            error_bdd_temp = self.mgr_.Zero()
+            for et_state in error_tracking_dfa.getNodes():
+                state_bdd_2 = self.make_node_state_bdd(et_state.getNr()-1, error_tracking_dfa)
+                if et_state.getDesignError()==0:
+                    error_bdd_temp += state_bdd_2
                 else:
-                    non_error_bdd_1 += state_bdd
+                    non_error_bdd_2 += state_bdd_2
+            error_bdd_2 &= error_bdd_temp
+
         #print "ERROR BDD 1. Correctness: A state is unsafe, if shieldError_ is true"
         #error_bdd_1.PrintMinterm()
         #print "=============="
         
-        self.err_state_bdd_ = error_bdd_1
-        self.not_error_state_bdd = non_error_bdd_1
+        self.err_state_bdd_ = error_bdd_1 & error_bdd_2
+        self.not_error_state_bdd = non_error_bdd_2 + non_error_bdd_1
         
         
     def create_error_states(self):
@@ -588,7 +637,7 @@ class Synthesizer(object):
 
     def calc_winning_region(self):
 
-        not_error_bdd = self.not_error_state_bdd
+        not_error_bdd = ~self.err_state_bdd_
         
         new_set_bdd = self.mgr_.One()
         while True:
@@ -599,9 +648,6 @@ class Synthesizer(object):
                 return self.mgr_.Zero()
 
             if new_set_bdd == curr_set_bdd:
-                
-                if new_set_bdd == not_error_bdd:
-                    print 'et+dev = non_error'
                 return new_set_bdd
 
     def suc_sys_bdd(self, src_states_bdd, transition_bdd):

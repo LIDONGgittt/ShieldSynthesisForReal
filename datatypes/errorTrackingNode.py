@@ -78,9 +78,17 @@ class ErrorTrackingNode(DfaNode):
             if sNode.isFinal():
                 return True
         return False
-
+    def isSingleGood(self):
+        if len(self.subNodes_)==1 and not self.isSubNodeFinal():
+            return True
+        return False
+        
     def isOnlyFinal(self):
         if len(self.subNodes_)==1 and self.isSubNodeFinal():
+            return True
+        return False
+    def isMultiGood(self):
+        if len(self.subNodes_) > 1 and not self.isSubNodeFinal():
             return True
         return False
 

@@ -17,8 +17,8 @@ class DfaEdge(object):
         self.targetNode_=targetNode
         self.label_=label
     def __repr__(self):
-        sourceNr=self.sourceNode_.toString(False, False)
-        targetNr=self.targetNode_.toString(False, False)
+        sourceNr=self.sourceNode_.toString(True, False)
+        targetNr=self.targetNode_.toString(True, False)
         retVal = str(sourceNr)+" -> "+str(targetNr)+": "+str(self.label_.__repr__())
         return retVal
   

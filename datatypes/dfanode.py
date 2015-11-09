@@ -60,7 +60,8 @@ class DfaNode(object):
         self.incomingEdges_.append(edge)
         
     def removeInEdge(self,edge,force=False):
-        self.incomingEdges_.remove(edge)
+        #self.incomingEdges_.remove(edge)
+        del(self.incomingEdges_[self.incomingEdges_.index(edge)])
         if not force:
             if len(self.incomingEdges_)==0 and not self.isInitial_:
                 raise Exception("you have removed the last incoming edge from non-initial node nr '"+str(self.NR_)+"'!")
