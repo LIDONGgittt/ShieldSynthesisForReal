@@ -267,17 +267,22 @@ USAGE
 
     # build Correctness Automaton, Error Tracking Automaton and Deviation Automaton
     # and synthesize output functions for shield
-
+    allowed_burst = 3
     if shield_algorithm == K_STABILIZING_ALGORITHM:
-        algorithm = KStabilizingAlgo(spec_dfas, allowed_dev)
+        algorithm = KStabilizingAlgo(spec_dfas, allowed_dev, allowed_burst)
     else:
         print 'This version does not support Finite Design Error algorithm'
         return
         #algorithm = FiniteDesignErrorAlgo(spec_dfas[0], 1, allowed_dev)
-        
     automata_time = round(time.time() - t_total,2)
     print("*** Automaton Construction time: " + str(automata_time) + "        ***")
+    
+    finalNode = algorithm.etDFAs_[0].getFinalNodes()[0]
 
+    if finalNode.getIncomingEdgesNum()==1:
+        print "This is a perfect shield!"
+    else:
+        print "This is NOT a perfect shield!"
     synthesis = Synthesizer(shield_algorithm, allowed_dev, compostional_shield)
     synthesis.synthesize(algorithm.etDFAs_, algorithm.sdDFA_, algorithm.scDFA_)
     
@@ -290,7 +295,7 @@ USAGE
             sys.exit(99)
         print("allowed_dev=" + str(allowed_dev))
 
-        algorithm = KStabilizingAlgo(spec_dfas, allowed_dev)
+        algorithm = KStabilizingAlgo(spec_dfas, allowed_dev, allowed_burst)
         
         del synthesis
         synthesis = Synthesizer(shield_algorithm, allowed_dev, compostional_shield)
