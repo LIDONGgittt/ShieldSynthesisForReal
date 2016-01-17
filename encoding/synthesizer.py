@@ -32,7 +32,7 @@ class Synthesizer(object):
     these properties, so they can be used to relax the synthesis.  
     '''
 
-    def __init__(self, algorithm, num_shield_deviations, compostional):
+    def __init__(self, algorithm, num_shield_deviations, fast):
         #print ("======================================\n synthesis  \n======================================\n")
         #init pycudd
         self.mgr_ = pycudd.DdManager()
@@ -54,21 +54,21 @@ class Synthesizer(object):
         self.state_offsets_ = dict()
         self.var_bdds_ = dict()
 
-        self.isComp = compostional
+        self.isFast = fast
         
         self.partial_strategy = self.mgr_.One()
 
     def inc_loop(self):
         self.loop_count += 1  # synthesis loop increase by 1
     
-    def synthesize(self, error_tracking_dfas, deviation_dfa, correctness_dfa):
+    def synthesize(self, error_tracking_dfa, deviation_dfa, correctness_dfa):
         
-        if self.isComp:
-            self.synthesize_comp(error_tracking_dfas, deviation_dfa, correctness_dfa)
+        if self.isFast:
+            self.synthesize_comp(error_tracking_dfa, deviation_dfa, correctness_dfa)
         else:
-            self.synthesize_non_comp(error_tracking_dfas[0], deviation_dfa, correctness_dfa)
+            self.synthesize_non_comp(error_tracking_dfa, deviation_dfa, correctness_dfa)
 
-    def synthesize_comp(self, error_tracking_dfas, deviation_dfa, correctness_dfa):
+    def synthesize_comp(self, error_tracking_dfa, deviation_dfa, correctness_dfa):
    
         synthe_0  = time.time()
         
@@ -77,18 +77,14 @@ class Synthesizer(object):
         self.err_state_bdd_ = self.mgr_.Zero()
         self.win_region_ = self.mgr_.Zero()
         
-        self.error_tracking_dfas_ = []
-        
-        for dfa in error_tracking_dfas:
-            self.error_tracking_dfas_.append(dfa.unify())
-            
+        self.error_tracking_dfa_ = error_tracking_dfa.unify()      
         self.deviation_dfa_ = deviation_dfa.unify()
         self.correctness_dfa_ = correctness_dfa.unify()
                 
-        self.dfa_list_ = self.error_tracking_dfas_ + [self.deviation_dfa_, self.correctness_dfa_]
+        self.dfa_list_ = [self.error_tracking_dfa_, self.deviation_dfa_, self.correctness_dfa_]
         
         self.comp_dfa_list_0 = [self.correctness_dfa_]
-        self.comp_dfa_list_1 = self.error_tracking_dfas_ + [self.deviation_dfa_]
+        self.comp_dfa_list_1 = [self.error_tracking_dfa_, self.deviation_dfa_]
         
         
         self.tmp_count_= 1
@@ -120,7 +116,7 @@ class Synthesizer(object):
         state_order= self.encode_states()
 
         
-        if True:
+        if False:
             self.create_init_states(self.dfa_list_)
             #encode variables
             var_order = self.encode_variables()
@@ -222,12 +218,12 @@ class Synthesizer(object):
             else:
                     
                 win_region_comp0 = self.mgr_.Zero()
-                print 'cannot find wining region for scDFA+drDFA!'
+                print 'cannot find wining region for scDFA!'
                 return
     
             
     
-            # 2. calc non-determistic strategy from etDFA, sdDFA and drDFA
+            # 2. calc non-determistic strategy from etDFA, sdDFA
     
             self.init_state_bdd_ = self.mgr_.One()
             self.transition_bdd_ = self.mgr_.One()
@@ -261,7 +257,7 @@ class Synthesizer(object):
                 self.transition_bdd_ &= correctness_transition_bdd
                 self.win_region_ &= win_region_comp0
                     
-                
+                self.getWinStateNum()
                 non_det_strategy = self.get_nondet_strategy(self.win_region_)
                 #print ("non-det-strategy")
                 #non_det_strategy.PrintMinterm()
@@ -360,6 +356,7 @@ class Synthesizer(object):
         if self.win_region_ != self.mgr_.Zero():
             #print("winning region:")
             #self.win_region_.PrintMinterm()
+            self.getWinStateNum()
             non_det_strategy = self.get_nondet_strategy(self.win_region_)
             self.func_by_var_ = self.extract_output_funcs(non_det_strategy)
 
@@ -369,6 +366,22 @@ class Synthesizer(object):
         
         synthe_2 = time.time()
         print("log: 2nd stage time: " + str(round(synthe_2 - synthe_1,2)))
+        
+    def getWinStateNum(self):
+        self.winStateNum = 0
+        self.allStateNum = len(self.deviation_dfa_.getNodes()) *len(self.error_tracking_dfa_.getNodes()) *len(self.correctness_dfa_.getNodes())
+        for dev_state in self.deviation_dfa_.getNodes():
+            for et_state in self.error_tracking_dfa_.getNodes():
+                for cor_state in self.correctness_dfa_.getNodes():
+                
+                    state_bdd_1 = self.make_node_state_bdd(dev_state.getNr()-1, self.deviation_dfa_)
+                    state_bdd_2 = self.make_node_state_bdd(et_state.getNr()-1, self.error_tracking_dfa_)
+                    state_bdd_3 = self.make_node_state_bdd(cor_state.getNr()-1, self.correctness_dfa_)
+                    
+                    state_bdd = state_bdd_1 & state_bdd_2 &state_bdd_3
+
+                    if (state_bdd & self.win_region_) != self.mgr_.Zero():
+                        self.winStateNum +=1
         
 
     def getResultModel(self, out_format=NUSMV):
@@ -569,15 +582,15 @@ class Synthesizer(object):
             else:
                 non_error_bdd_1 += state_bdd_1
         
-        for error_tracking_dfa in self.error_tracking_dfas_:
-            error_bdd_temp = self.mgr_.Zero()
-            for et_state in error_tracking_dfa.getNodes():
-                state_bdd_2 = self.make_node_state_bdd(et_state.getNr()-1, error_tracking_dfa)
-                if et_state.getDesignError()==0:
-                    error_bdd_temp += state_bdd_2
-                else:
-                    non_error_bdd_2 += state_bdd_2
-            error_bdd_2 &= error_bdd_temp
+        
+        
+        for et_state in self.error_tracking_dfa_.getNodes():
+            state_bdd_2 = self.make_node_state_bdd(et_state.getNr()-1, self.error_tracking_dfa_)
+            if et_state.getDesignError()==0:
+                error_bdd_2 += state_bdd_2
+            else:
+                non_error_bdd_2 += state_bdd_2
+        
 
         #print "ERROR BDD 1. Correctness: A state is unsafe, if shieldError_ is true"
         #error_bdd_1.PrintMinterm()

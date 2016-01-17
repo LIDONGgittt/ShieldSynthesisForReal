@@ -100,7 +100,7 @@ USAGE
         parser.add_argument("-e", "--encoding", dest="encoding", help="encoding format of the output file. Support verilog or smv. [default: smv]", default="smv")
         parser.add_argument("-v", "--visspec", dest="visspec", help="specification input file for VIS model checker")
         parser.add_argument('-V', '--version', action='version', version=program_version_message)
-        parser.add_argument('-c', '--compositional', dest='compo', action='store_true', help='generate compositional shield for each property specified.', default=False)
+        parser.add_argument('-f', '--fastSynthesis', dest='fast', action='store_true', help='generate compositional shield for each property specified.', default=False)
         parser.add_argument("-dev", "--deviation", dest="deviation", help="override the allowed deviation(assigned to 1 means must be greater than 1).[default: 1]", type=int, default=1)
         parser.add_argument('spec_file', nargs='+')
 
@@ -153,9 +153,9 @@ USAGE
         if args.algorithm=="fealgo":
             shield_algorithm = FINITE_ERROR_ALGORITHM
 
-        compostional_shield = False  
-        if args.compo:
-            compostional_shield = True  
+        fast_syn = False  
+        if args.fast:
+            fast_syn = True  
             shield_algorithm = K_STABILIZING_ALGORITHM  # FIXME: for compositional synthesis, block finite_error algorithm
             
         spec_files = args.spec_file
@@ -186,8 +186,8 @@ USAGE
 
         #output file name is a combination of all input file names
         output_file_name = ''
-        if compostional_shield:
-            output_file_name="output/imp/c_"
+        if fast_syn:
+            output_file_name="output/imp/f_"
         else:
             output_file_name="output/imp/"   
             
@@ -232,10 +232,10 @@ USAGE
     if encoding == VERILOG and (not visspec_present or not design_present):
         print("** No VIS Specification or Design file present. No verification with VIS")
     
-    if compostional_shield:
-        print("** Generate compositional shields for each property")
+    if fast_syn:
+        print("** Use implication to compute winning strategy")
     else:
-        print("** Generate one unified shield for all properties")
+        print("** Use standard algorithm to compute winning strategy")
 
     print("** Used specification automaton input files:")
     for spec_file in spec_files:
@@ -244,32 +244,25 @@ USAGE
     print("************************************************\n")
 
     #build specification DFA
-    spec_dfas=[]
+
+    dfa_parser = DfaParser(args.spec_file[0])   
+    prod_dfa = dfa_parser.getParsedDFA()
     
-    if compostional_shield:
-        for i in range(0, len(args.spec_file)):
-            dfa_parser = DfaParser(args.spec_file[i])
-            spec_dfas.append(dfa_parser.getParsedDFA())
-    else:
-        dfa_parser = DfaParser(args.spec_file[0])   
-        prod_dfa = dfa_parser.getParsedDFA()
+    for i in range(1, len(args.spec_file)):
+        dfa_parser = DfaParser(args.spec_file[i])
+        spec_dfa_2 = dfa_parser.getParsedDFA()
         
-        for i in range(1, len(args.spec_file)):
-            dfa_parser = DfaParser(args.spec_file[i])
-            spec_dfa_2 = dfa_parser.getParsedDFA()
-            
-            #design_dfa = spec_dfa_2 # TODO: test code
-            prod_dfa = prod_dfa.buildProductOfAutomata(spec_dfa_2, True)
-            prod_dfa = prod_dfa.combineUnsafeStates()
-            prod_dfa = prod_dfa.standardization(True)
-        spec_dfas.append(prod_dfa)
+        prod_dfa = prod_dfa.buildProductOfAutomata(spec_dfa_2, True)
+        prod_dfa = prod_dfa.combineUnsafeStates()
+        prod_dfa = prod_dfa.standardization(True)
+    spec_dfa= prod_dfa
     
 
     # build Correctness Automaton, Error Tracking Automaton and Deviation Automaton
     # and synthesize output functions for shield
-    allowed_burst = 3
+    allowed_burst = 0
     if shield_algorithm == K_STABILIZING_ALGORITHM:
-        algorithm = KStabilizingAlgo(spec_dfas, allowed_dev, allowed_burst)
+        algorithm = KStabilizingAlgo(spec_dfa, allowed_dev, allowed_burst)
     else:
         print 'This version does not support Finite Design Error algorithm'
         return
@@ -277,43 +270,31 @@ USAGE
     automata_time = round(time.time() - t_total,2)
     print("*** Automaton Construction time: " + str(automata_time) + "        ***")
     
-    finalNode = algorithm.etDFAs_[0].getFinalNodes()[0]
-
-    if finalNode.getIncomingEdgesNum()==1:
-        print "This is a perfect shield!"
-    else:
-        print "This is NOT a perfect shield!"
-    synthesis = Synthesizer(shield_algorithm, allowed_dev, compostional_shield)
-    synthesis.synthesize(algorithm.etDFAs_, algorithm.sdDFA_, algorithm.scDFA_)
+    if allowed_burst>0:
+    
+        finalNode = algorithm.etDFA_.getFinalNodes()[0]
+    
+        if finalNode.getIncomingEdgesNum()==1:
+            print "This is a perfect shield!"
+        else:
+            print "This is NOT a perfect shield!"
+            
+    synthesis = Synthesizer(shield_algorithm, allowed_dev, fast_syn)
+    synthesis.synthesize(algorithm.etDFA_, algorithm.sdDFA_, algorithm.scDFA_)
     
     
     while not synthesis.existsWinningRegion():
-        #synthesis = None    #give GC time to destroy previous manager instance
-        allowed_dev = allowed_dev + 1
-        if allowed_dev >= MAX_DEVIATIONS:
-            print "Killing because of deviation counter greater than " + str(MAX_DEVIATIONS)
-            sys.exit(99)
-        print("allowed_dev=" + str(allowed_dev))
-
-        algorithm = KStabilizingAlgo(spec_dfas, allowed_dev, allowed_burst)
+        print 'Something gose wrong!'
+        return 404
         
-        del synthesis
-        synthesis = Synthesizer(shield_algorithm, allowed_dev, compostional_shield)
-        synthesis.synthesize(algorithm.etDFAs_, algorithm.sdDFA_, algorithm.scDFA_)
         #synthesis = Synthesizer(shield_algorithm, allowed_dev, algorithm.etDFA_, algorithm.sdDFA_, algorithm.scDFA_, algorithm.drDFA_)
     
-    # for compositional synthesis, there will be more than one spec_dfa
-    # so we update design_dfa to include the property just synthesized
-    final_dfa = algorithm.finalDFA_ 
-    
-    
-    
-            
-    
-    #create output file and verify shield
-    
 
-    
+
+    final_dfa = spec_dfa
+      
+    #create output file and verify shield
+
     verify = False
     result = True
     t_verify = 0
@@ -386,15 +367,16 @@ USAGE
     total_time = round(time.time() - t_total,2)
 
     print("******************************************")
-    print("*** Final Spec Automaton:        ***")
-    print("**** num states: " + str(final_dfa.getNodeNum()) + "        ***")
-    print("**** num edges: " + str(final_dfa.getNumEdges()) + "        ***")
-    print("**** num inputs: " + str(len(final_dfa.getInputVars())) + "        ***")
-    print("**** num outputs " + str(len(final_dfa.getOutputVars())) + "        ***")
+    print("*** Final Spec Automaton:")
+    print("***     num states: " + str(final_dfa.getNodeNum()))
+    print("***     num edges: " + str(final_dfa.getNumEdges()))
+    print("***     num inputs: " + str(len(final_dfa.getInputVars())))
+    print("***     num outputs " + str(len(final_dfa.getOutputVars())))
     if verify:
-        print("*** Time for synthesis: " + str(total_time-verify_time) + "       ***")
-        print("*** Time for verification: " + str(verify_time) + "       ***")
-    print("*** Total execution time: " + str(total_time) + "        ***")
+        print("*** Time for synthesis: " + str(total_time-verify_time))
+        print("*** Time for verification: " + str(verify_time))
+    print("*** Total execution time: " + str(total_time))
+    print("*** Num wining states: "+ str(synthesis.winStateNum)+"/"+str(synthesis.allStateNum))
     print("******************************************")
 
     if result:

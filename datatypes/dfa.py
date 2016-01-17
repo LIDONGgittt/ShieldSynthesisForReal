@@ -484,7 +484,7 @@ class DFA(object):
         
         outputStr+=" transitions:\n"
         for edge in self.Edges_:
-             outputStr+="    "+self.getPrettyEdge(edge,nodeDetails)+"\n"
+            outputStr+="    "+self.getPrettyEdge(edge,nodeDetails)+"\n"
         
         
            

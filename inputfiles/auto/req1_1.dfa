@@ -1,0 +1,36 @@
+
+
+#/*******************************************************************************
+# Example toyota auto
+#
+# Spec:  if the brake is applied prior to pressing the accelerator pedal, then the brakes
+#        and throttle will both be applied;
+# Input: bp
+# Output th, br 
+#
+#***************************************************************************/
+
+dfa 4 2 2 1 1 16
+1                   #initial state
+2                   #final state
+1 1 -1 2            #brake pedal is pressed, gas pedal is released
+1 2 1 2 3 -4         
+1 2 1 2 -3 -4
+1 2 1 2 -3 4
+1 3 1 2 3 4  #brake pedal is pressed prior to gas pedal. applied both brake and throttle
+1 4 -2 #brake pedal released
+4 4 -2
+4 4 1 2
+4 1 -1 2
+2 2
+3 1 -1 2
+3 2 1 2 -3 4
+3 2 1 2 3 -4
+3 2 1 2 -3 -4
+3 3 1 2 3 4
+3 4 -2
+1 gp
+2 bp
+3 throttle
+4 brake
+

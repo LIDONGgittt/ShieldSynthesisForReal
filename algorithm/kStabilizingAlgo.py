@@ -25,7 +25,7 @@ class KStabilizingAlgo(object):
     Only after these k time steps, the next specification violation can be tolerated.
     '''
 
-    def __init__(self, specDfas, numShieldDeviations, numDesignBurst):
+    def __init__(self, specDfa, numShieldDeviations, numDesignBurst):
 
         '''
         Constructor
@@ -35,19 +35,12 @@ class KStabilizingAlgo(object):
         
 
         
-        self.specDfas_ = specDfas
+        self.specDfa_ = specDfa
         
-        prod_dfa = specDfas[0]
-        for i in range(1, len(specDfas)):
-            #design_dfa = spec_dfa_2 # TODO: test code
-            prod_dfa = prod_dfa.buildProductOfAutomata(specDfas[i], True)
-            prod_dfa = prod_dfa.combineUnsafeStates()
-            prod_dfa = prod_dfa.standardization(True)
-        
-        self.finalDFA_ = prod_dfa
+        self.finalDFA_ = specDfa
             
         #Error Tracking Automaton
-        self.etDFAs_ = []
+        self.etDFA_ = DFA()
         #Shield Deviation Automaton
         self.sdDFA_ = DFA()
         #Shield Correctness Automaton
@@ -59,12 +52,9 @@ class KStabilizingAlgo(object):
         self.numDesignBurst = numDesignBurst
         if DEBUG:
             print( "  start building ErrorTrackingAutomaton...")
-        
-        for dfa in self.specDfas_:
-            self.specDfa_ = dfa
-            self.etDFAs_.append(self.buildErrorTrackingAutomaton())
             
-        self.specDfa_ = self.finalDFA_
+        self.etDFA_  = self.buildErrorTrackingAutomaton()
+        
         if DEBUG:
             print( "  ...done")
             print( "  start building ShieldDeviationAutomaton...")
@@ -108,12 +98,11 @@ class KStabilizingAlgo(object):
         done=[]
         iter_num = 0
         
-        distinct_Count = self.numDesignBurst+1
         if self.numDesignBurst > 0:
             errorState = ErrorTrackingNode()
             finalSubNodes = self.specDfa_.getFinalNodes()
             errorState.appendSubNode(finalSubNodes[0])
-            errorState.setDesignError(distinct_Count)
+            errorState.setDesignError(self.numDesignBurst+1)
             errorState.setFinal(True)
             etDFA.addNode(errorState, True)
             etDFA.addEdge(errorState, errorState, DfaLabel())
@@ -134,12 +123,24 @@ class KStabilizingAlgo(object):
             sState = state.getSubNode(0)
             for sEdge in sState.getOutgoingEdges():
                 targetState = ErrorTrackingNode()
-                targetState.appendSubNode(sEdge.getTargetNode())
-                #decrease counter until next design error for target state
-                if state.getDesignError()>0:
-                    targetState.setDesignError(distinct_Count) # a temp counter
+                
+                sTargetState = sEdge.getTargetNode()
+                
+                if sTargetState.isFinal():
+                    #targetState.setDesignError(state.getDesignError()+1)
+                    targetState.setDesignError(1)
+                    label = sEdge.getLabel()
+                    for edge2 in sState.getOutgoingEdges():
+                        targetState2 = edge2.getTargetNode()
+                        label2 = edge2.getLabel()
+                        if etDFA.checkInputCompatibility(label, label2):
+                            if not targetState2.isFinal():
+                                targetState.appendSubNode(targetState2)
                 else:
                     targetState.setDesignError(0)
+                    targetState.appendSubNode(sTargetState)
+
+
                 targetState = etDFA.addNode(targetState)
                 etDFA.addEdge(state, targetState, sEdge.getLabel())
 
@@ -155,15 +156,45 @@ class KStabilizingAlgo(object):
                         sLabel = sEdge.getLabel()
                         combLabel = sLabel.merge(label)
                         if combLabel.isValidLabel():
-                            combTargetState = edge.getTargetNode().combineNodes(sTargetState)
+                            if sTargetState.isFinal():
+                                label1 = sEdge.getLabel()
+                                for sEdge2 in sEdges:
+                                    targetState2 = sEdge2.getTargetNode()
+                                    label2 = sEdge2.getLabel()
+                                    if etDFA.checkInputCompatibility(label1, label2):
+                                        if not targetState2.isFinal():
+                                            combTargetState = edge.getTargetNode().combineNodes(targetState2)
+                                            #combTargetState.setDesignError(state.getDesignError()+1)  
+                                            combTargetState.setDesignError(1)
+                            else:
+                                combTargetState = edge.getTargetNode().combineNodes(sTargetState)
+                            
+                            
+#                             
+#                             for j in range(1, combTargetState.getDesignError()+1):
+#                                 combTargetState.setDesignError(j)
+#                                 if combTargetState in etDFA.getNodes():
+#                                     break
+                            
+                                
                             combTargetState = etDFA.addNode(combTargetState)
                             etDFA.addEdge(state, combTargetState, combLabel)
                     etDFA.removeEdge(edge, True)
-
+                            
+                            
+             
+                
             #Deal with errors
             edges = state.getOutgoingEdges()
             for edge in edges:
-                targetState = ErrorTrackingNode(edge.getTargetNode())
+                targetState = edge.getTargetNode()
+#                 if targetState.getDesignError() > self.numDesignBurst:
+#                     #etDFA.changeEdgeTarget(edge, errorState, True)
+#                     
+#                 
+#                 el
+                if not targetState in done and not targetState in workset:
+                    workset.append(targetState)
                 
                 #Case 1: only one good state, do not need to guess anymore
 #                 if targetState.isSingleGood():
@@ -190,55 +221,55 @@ class KStabilizingAlgo(object):
 #                     targetState.setDesignError(2)
 #                     etDFA.changeEdgeTarget(edge, targetState, True)
                     
-                if targetState.isSubNodeFinal():
-                    #Case 2: if any node is error, keep guessing this error node by replace it with abstract nodes
-                    #until reach burst tolerate bound
-                    if state.getDesignError() >= self.numDesignBurst:
-                        etDFA.changeEdgeTarget(edge, errorState, True)
-                    
-                    else:
-                    # or else go to any targetState possible with the same input vars
-                        newTargetState = ErrorTrackingNode()
-                        label = edge.getLabel()
-                        edges2 =  state.getOutgoingEdges()
-                        for edge2 in edges2:
-                            targetState2 = edge2.getTargetNode()
-                            label2 = edge2.getLabel()
-                            if etDFA.checkInputCompatibility(label, label2):
-                                #go to targetState2
-                                for i in range(0,targetState2.getSubNodeNum()):
-                                    if not targetState2.getSubNode(i).isFinal():
-                                        newTargetState.appendSubNode(targetState2.getSubNode(i))
-    #                     if newTargetState.getSubNodeNum() == 1:
-    #                         newTargetState.setDesignError(1)
-    #                     else:
-    #                         newTargetState.setDesignError(2)
-                        k=1
-                        while True:                                           
-                            newTargetState.setDesignError(k)     
-                            if newTargetState in etDFA.getNodes() or k == state.getDesignError()+1:
-                                newTargetState = etDFA.addNode(newTargetState)
-                                etDFA.changeEdgeTarget(edge, newTargetState, True)
-                                if not newTargetState in done and not newTargetState in workset:
-                                    #newTargetState = etDFA.addNode(newTargetState)
-                                    workset.append(newTargetState)  
-                                break
-                            k=k+1
-   
-                #Case 3: all good state, still guessing the next step
-#                 elif not targetState.isSubNodeFinal() and state.getDesignError() > 0:
+#                 if targetState.isSubNodeFinal():
+#                     #Case 2: if any node is error, keep guessing this error node by replace it with abstract nodes
+#                     #until reach burst tolerate bound
+#                     if state.getDesignError() >= self.numDesignBurst:
+#                         etDFA.changeEdgeTarget(edge, errorState, True)
+#                     
+#                     else:
+#                     # or else go to any targetState possible with the same input vars
+#                         newTargetState = ErrorTrackingNode()
+#                         label = edge.getLabel()
+#                         edges2 =  state.getOutgoingEdges()
+#                         for edge2 in edges2:
+#                             targetState2 = edge2.getTargetNode()
+#                             label2 = edge2.getLabel()
+#                             if etDFA.checkInputCompatibility(label, label2):
+#                                 #go to targetState2
+#                                 for i in range(0,targetState2.getSubNodeNum()):
+#                                     if not targetState2.getSubNode(i).isFinal():
+#                                         newTargetState.appendSubNode(targetState2.getSubNode(i))
+#     #                     if newTargetState.getSubNodeNum() == 1:
+#     #                         newTargetState.setDesignError(1)
+#     #                     else:
+#     #                         newTargetState.setDesignError(2)
+#                         k=1
+#                         while True:                                           
+#                             newTargetState.setDesignError(k)     
+#                             if newTargetState in etDFA.getNodes() or k == state.getDesignError()+1:
+#                                 newTargetState = etDFA.addNode(newTargetState)
+#                                 etDFA.changeEdgeTarget(edge, newTargetState, True)
+#                                 if not newTargetState in done and not newTargetState in workset:
+#                                     #newTargetState = etDFA.addNode(newTargetState)
+#                                     workset.append(newTargetState)  
+#                                 break
+#                             k=k+1
+#    
+#                 #Case 3: all good state, still guessing the next step
+# #                 elif not targetState.isSubNodeFinal() and state.getDesignError() > 0:
+# #                     targetState.setDesignError(0)
+# #                     targetState = etDFA.addNode(targetState)
+# #                     etDFA.changeEdgeTarget(edge, targetState, True)
+# #                     if not targetState in done and not targetState in workset:
+# #                             workset.append(targetState)
+#                 else:
 #                     targetState.setDesignError(0)
 #                     targetState = etDFA.addNode(targetState)
 #                     etDFA.changeEdgeTarget(edge, targetState, True)
 #                     if not targetState in done and not targetState in workset:
 #                             workset.append(targetState)
-                else:
-                    targetState.setDesignError(0)
-                    targetState = etDFA.addNode(targetState)
-                    etDFA.changeEdgeTarget(edge, targetState, True)
-                    if not targetState in done and not targetState in workset:
-                            workset.append(targetState)
-                    
+#                     
               
 #             edges =  state.getOutgoingEdges()
 #             for edge in edges:

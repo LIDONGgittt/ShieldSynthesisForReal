@@ -6,7 +6,7 @@
 # Spec: G(!farm_light & !hwy_light) & 
 #       G(farm_light & !hwy_light -> X(!farm_light & hwy_light))  
 #	G(!farm_light & hwy_light -> X(farm_light & !hwy_light)) 
-# Input: 
+# Input: emergeny
 # Output farm_light hwy_light;
 #
 # Dummy Design: All Outputs are always False 
