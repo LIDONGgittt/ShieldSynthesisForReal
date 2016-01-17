@@ -95,12 +95,12 @@ USAGE
     try:
         # Setup argument parser
         parser = ArgumentParser(description=program_license, formatter_class=RawDescriptionHelpFormatter)
-        parser.add_argument("-a", "--algorithm", dest="algorithm", help="Used algorithm to synthesize shield. Support fealgo (finite design error algorithm) or ksalgo (k-stabilizing algorithm. [default: ksalgo]", default="ksalgo")
-        parser.add_argument("-d", "--design", dest="design", help="concrete design to be load (written as automaton or in verilog)")
-        parser.add_argument("-e", "--encoding", dest="encoding", help="encoding format of the output file. Support verilog or smv. [default: smv]", default="smv")
-        parser.add_argument("-v", "--visspec", dest="visspec", help="specification input file for VIS model checker")
+#         parser.add_argument("-a", "--algorithm", dest="algorithm", help="Used algorithm to synthesize shield. Support fealgo (finite design error algorithm) or ksalgo (k-stabilizing algorithm. [default: ksalgo]", default="ksalgo")
+#         parser.add_argument("-d", "--design", dest="design", help="concrete design to be load (written as automaton or in verilog)")
+#         parser.add_argument("-e", "--encoding", dest="encoding", help="encoding format of the output file. Support verilog or smv. [default: smv]", default="smv")
+#         parser.add_argument("-v", "--visspec", dest="visspec", help="specification input file for VIS model checker")
         parser.add_argument('-V', '--version', action='version', version=program_version_message)
-        parser.add_argument('-f', '--fastSynthesis', dest='fast', action='store_true', help='generate compositional shield for each property specified.', default=False)
+        parser.add_argument('-f', '--fastSynthesis', dest='fast', action='store_true', help='compute winning region using implication.', default=False)
         parser.add_argument("-dev", "--deviation", dest="deviation", help="override the allowed deviation(assigned to 1 means must be greater than 1).[default: 1]", type=int, default=1)
         parser.add_argument('spec_file', nargs='+')
 
@@ -126,16 +126,16 @@ USAGE
         # Process arguments
         args = parser.parse_args()
 
-        if not args.encoding == "smv" and not args.encoding == "verilog":
-            parser.print_usage()
-            print("ERROR: ENCODING has to be 'smv' or 'verilog'!")
-            sys.exit(-1)
+#         if not args.encoding == "smv" and not args.encoding == "verilog":
+#             parser.print_usage()
+#             print("ERROR: ENCODING has to be 'smv' or 'verilog'!")
+#             sys.exit(-1)
             
-        if not args.algorithm == "fealgo" and not args.algorithm == "ksalgo":
-            parser.print_usage()
-            print("ERROR: ALGORITHM has to be 'fealgo' or 'ksalgo'!")
-            sys.exit(-1)
-        
+#         if not args.algorithm == "fealgo" and not args.algorithm == "ksalgo":
+#             parser.print_usage()
+#             print("ERROR: ALGORITHM has to be 'fealgo' or 'ksalgo'!")
+#             sys.exit(-1)
+#         
 
            
         if args.deviation >0:
@@ -145,13 +145,13 @@ USAGE
             print("ERROR: DEVIATION has to be greater than 1!")
             sys.exit(-1)
         
-        encoding = SMV
-        if args.encoding=="verilog":
-            encoding = VERILOG
+        encoding = VERILOG
+#         if args.encoding=="verilog":
+#             encoding = VERILOG
 
         shield_algorithm = K_STABILIZING_ALGORITHM
-        if args.algorithm=="fealgo":
-            shield_algorithm = FINITE_ERROR_ALGORITHM
+#         if args.algorithm=="fealgo":
+#             shield_algorithm = FINITE_ERROR_ALGORITHM
 
         fast_syn = False  
         if args.fast:
@@ -161,35 +161,35 @@ USAGE
         spec_files = args.spec_file
         design_dfa = None
         design_present = True
-        if not args.design:
-            design_present = False
-        else:
-            design_file =  args.design
-            #parse design file
-            if encoding == SMV:   #FIXME: cannot have smv design file and want to produce a verilog output file?
-                #design must be an automaton
-                dfa_parser = DfaParser(design_file)
-                design_dfa = dfa_parser.getParsedDFA()
-            else:
-                #design must be a verilog module
-                with open (design_file, "r") as myfile:
-                    verilog_design_str=myfile.read()
-
+#         if not args.design:
+#             design_present = False
+#         else:
+#             design_file =  args.design
+#             #parse design file
+#             if encoding == SMV:   #FIXME: cannot have smv design file and want to produce a verilog output file?
+#                 #design must be an automaton
+#                 dfa_parser = DfaParser(design_file)
+#                 design_dfa = dfa_parser.getParsedDFA()
+#             else:
+#                 #design must be a verilog module
+#                 with open (design_file, "r") as myfile:
+#                     verilog_design_str=myfile.read()
+# 
         visspec_present = False
-        if args.visspec:
-            visspec_present = True
-            vis_spec = args.visspec
-
-        if visspec_present and encoding == SMV:
-            print("\n[WARNIG:] Changed encoding to verilog. Otherwise no verification with VIS possible.\n")
-            encoding = VERILOG
+#         if args.visspec:
+#             visspec_present = True
+#             vis_spec = args.visspec
+# 
+#         if visspec_present and encoding == SMV:
+#             print("\n[WARNIG:] Changed encoding to verilog. Otherwise no verification with VIS possible.\n")
+#             encoding = VERILOG
 
         #output file name is a combination of all input file names
         output_file_name = ''
         if fast_syn:
-            output_file_name="output/imp/f_"
+            output_file_name="output/f_"
         else:
-            output_file_name="output/imp/"   
+            output_file_name="output/"   
             
         for input_file in spec_files:
             input_file_name = input_file.split("/")
