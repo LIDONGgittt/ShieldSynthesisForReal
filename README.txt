@@ -27,7 +27,8 @@ Running our synthesis tool:
    executing
     > python ./shield.py path/to/spec_automaton.dfa
    should be enough. You can also list several .dfa-files, then the tool
-   automatically computes the product automaton. You can also add the option -f to simplify the winning region computation by using implication.
+   automatically computes the product automaton. You can also add the option -f 
+   to simplify the winning region computation by using implication. 
  - The safety specification automaton is defined with a very simple textual
    format. This format is described in the file docs/InputFormat.txt.
  - Example input files can be found in the directory 
@@ -42,6 +43,33 @@ Guarantee 1 2 and 3 of the ARM AMBA AHB bus controller:
 - Execute
    > python ./shield.py inputfiles/amba/amba_g1.dfa inputfiles/amba/amba_g2.dfa inputfiles/amba/amba_g3.dfa
   to synthesize a shield for this example. The result will be written to the file output/amba_g1_amba_g2_amba_g3.v
+
+  An example output should be like:
+  ************************************************
+  * Setup for Shield Synthesis:
+  ** Output File in Verilog Format
+  ** Used Synthesis Algorithm: Burst Error Shield Algorithm
+  ** Use standard algorithm to compute winning strategy
+  ** Used specification automaton input files:
+  *** inputfiles/amba/amba_g1.dfa
+  *** inputfiles/amba/amba_g2.dfa
+  *** inputfiles/amba/amba_g3.dfa
+  ************************************************
+
+  log: Size of spec(node/edge): 12/131
+  iteration number for etDFA:22
+  *** Automaton Construction time: 0.05        ***
+  log: 1st stage time: 0.02
+  log: 2nd stage time: 0.03
+  ******************************************
+  *** Final Spec Automaton:
+  ***     num states: 12
+  ***     num edges: 131
+  ***     num inputs: 4
+  ***     num outputs 2
+  *** Total execution time: 0.17
+  *** Num wining states: 186/528
+  ******************************************
 
 Specification patterns by Dwyer et al:
 --------------------------------------
