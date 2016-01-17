@@ -1,11 +1,4 @@
-'''
-Created on Jun 10, 2014
-
-@author: bkoenighofer
-
-@change: 2016/06/11 by mengwu@vt.edu 
-         try to synthesis shields by for each property instead of a composed property, make use of previous properties to relax current shield
-'''
+__author__ = 'bkoenighofer'
 
 from datatypes.dfanode import DfaNode
 from datatypes.dfa import DFA
@@ -13,7 +6,7 @@ from datatypes.dfalabel import DfaLabel
 from datatypes.productnode import ProductNode
 from datatypes.errorTrackingNode import ErrorTrackingNode
 from itertools import combinations
-from collections import deque
+
 import time
 
 DEBUG = 0
@@ -25,36 +18,28 @@ class KStabilizingAlgo(object):
     Only after these k time steps, the next specification violation can be tolerated.
     '''
 
-    def __init__(self, specDfa, numShieldDeviations, numDesignBurst):
+    def __init__(self, specDfa, numShieldDeviations):
 
         '''
         Constructor
         '''
         #original Specification Automaton
-
-        
-
-        
         self.specDfa_ = specDfa
-        
-        self.finalDFA_ = specDfa
-            
+
         #Error Tracking Automaton
         self.etDFA_ = DFA()
         #Shield Deviation Automaton
         self.sdDFA_ = DFA()
         #Shield Correctness Automaton
         self.scDFA_ = DFA()
-        #Design Relax Automaton
-        
-        
+        #Final Product DFA
+        self.finalDFA_ = DFA()
+
         self.numShieldDeviations_ = numShieldDeviations
-        self.numDesignBurst = numDesignBurst
+
         if DEBUG:
             print( "  start building ErrorTrackingAutomaton...")
-            
-        self.etDFA_  = self.buildErrorTrackingAutomaton()
-        
+        self.buildErrorTrackingAutomaton()
         if DEBUG:
             print( "  ...done")
             print( "  start building ShieldDeviationAutomaton...")
@@ -65,7 +50,13 @@ class KStabilizingAlgo(object):
         self.buildShieldCorrectnessAutomaton()
         if DEBUG:
             print( "  ...done")
-            
+
+        #print("1) Final Error Tracking DFA after Standardization")
+        #self.etDFA_.debugPrintDfa(True)
+        #print("2) Final Shield Deviation DFA")
+        #self.sdDFA_.debugPrintDfa(True)
+        #print("3) Final Shield Correctness DFA")
+        #self.scDFA_.debugPrintDfa(True)
 
     '''
     Creates automata to track the behavior of the design.
@@ -74,8 +65,7 @@ class KStabilizingAlgo(object):
     Each time the design makes an error, the error level of the next state is increased
     until 'allowedDesignError' is reached. The next error leads to the only real error state,
     in which the automata stays forever.
-    ''' 
-
+    '''
     def buildErrorTrackingAutomaton(self):
         #build state list
 
@@ -85,62 +75,50 @@ class KStabilizingAlgo(object):
         etDFA.setInputVars(self.specDfa_.getInputVars())
         etDFA.setOutputVars(self.specDfa_.getOutputVars())
 
-        
-        for sNode in self.specDfa_.getNodes():
-            if not sNode.isFinal():
-                eTNode = ErrorTrackingNode()
-                eTNode.appendSubNode(sNode)
-                eTNode.setInitial(sNode.isInitial())
-                etDFA.addNode(eTNode, True)               
-        
-        print 'log: Size of spec(node/edge): '+str(len(self.specDfa_.getNodes()))+'/'+str(len(self.specDfa_.getEdges()))
-        workset= deque(etDFA.getNodes())
+        initialSNodes = self.specDfa_.getInitialNodes()
+        for sNode in initialSNodes:
+            eTNode = ErrorTrackingNode()
+            eTNode.appendSubNode(sNode)
+            eTNode.setInitial(True)
+            etDFA.addNode(eTNode, True)
+            
+#         print 'log: Size of spec: '+str(len(self.specDfa_.getNodes()))
+        workset=etDFA.getNodes()
         done=[]
-        iter_num = 0
-        
-        if self.numDesignBurst > 0:
+        iter_num =0
+        #designError_ counter counts from self.numShieldDeviations_ to 0. only if designError_ is 0, a new design error is ok
+
+        #add error state
+        if self.numShieldDeviations_ > 1:
             errorState = ErrorTrackingNode()
             finalSubNodes = self.specDfa_.getFinalNodes()
             errorState.appendSubNode(finalSubNodes[0])
-            errorState.setDesignError(self.numDesignBurst+1)
+            errorState.setDesignError(self.numShieldDeviations_+1)
             errorState.setFinal(True)
             etDFA.addNode(errorState, True)
             etDFA.addEdge(errorState, errorState, DfaLabel())
 
-
-
-        
-        
-        
         while len(workset) > 0:
+
             iter_num = iter_num+1
 #             print 'log: Iteration of etDFA construction: '+str(iter_num)
-            
-            state = workset.popleft()
+            state = workset[0]
+            del workset[0]
             done.append(state)
 
-            
+            #compute targetStates from state
+            #Compute target state by combining all sTargetStates from all sStates from state
+            #-start with sTargetStates from first sState
+
             sState = state.getSubNode(0)
             for sEdge in sState.getOutgoingEdges():
                 targetState = ErrorTrackingNode()
-                
-                sTargetState = sEdge.getTargetNode()
-                
-                if sTargetState.isFinal():
-                    #targetState.setDesignError(state.getDesignError()+1)
-                    targetState.setDesignError(1)
-                    label = sEdge.getLabel()
-                    for edge2 in sState.getOutgoingEdges():
-                        targetState2 = edge2.getTargetNode()
-                        label2 = edge2.getLabel()
-                        if etDFA.checkInputCompatibility(label, label2):
-                            if not targetState2.isFinal():
-                                targetState.appendSubNode(targetState2)
+                targetState.appendSubNode(sEdge.getTargetNode())
+                #decrease counter until next design error for target state
+                if state.getDesignError()>0:
+                    targetState.setDesignError(state.getDesignError()-1)
                 else:
                     targetState.setDesignError(0)
-                    targetState.appendSubNode(sTargetState)
-
-
                 targetState = etDFA.addNode(targetState)
                 etDFA.addEdge(state, targetState, sEdge.getLabel())
 
@@ -156,169 +134,66 @@ class KStabilizingAlgo(object):
                         sLabel = sEdge.getLabel()
                         combLabel = sLabel.merge(label)
                         if combLabel.isValidLabel():
-                            if sTargetState.isFinal():
-                                label1 = sEdge.getLabel()
-                                for sEdge2 in sEdges:
-                                    targetState2 = sEdge2.getTargetNode()
-                                    label2 = sEdge2.getLabel()
-                                    if etDFA.checkInputCompatibility(label1, label2):
-                                        if not targetState2.isFinal():
-                                            combTargetState = edge.getTargetNode().combineNodes(targetState2)
-                                            #combTargetState.setDesignError(state.getDesignError()+1)  
-                                            combTargetState.setDesignError(1)
-                            else:
-                                combTargetState = edge.getTargetNode().combineNodes(sTargetState)
-                            
-                            
-#                             
-#                             for j in range(1, combTargetState.getDesignError()+1):
-#                                 combTargetState.setDesignError(j)
-#                                 if combTargetState in etDFA.getNodes():
-#                                     break
-                            
-                                
+                            combTargetState = edge.getTargetNode().combineNodes(sTargetState)
                             combTargetState = etDFA.addNode(combTargetState)
                             etDFA.addEdge(state, combTargetState, combLabel)
                     etDFA.removeEdge(edge, True)
-                            
-                            
-             
-                
+
             #Deal with errors
             edges = state.getOutgoingEdges()
             for edge in edges:
-                targetState = edge.getTargetNode()
-#                 if targetState.getDesignError() > self.numDesignBurst:
-#                     #etDFA.changeEdgeTarget(edge, errorState, True)
-#                     
-#                 
-#                 el
-                if not targetState in done and not targetState in workset:
-                    workset.append(targetState)
-                
-                #Case 1: only one good state, do not need to guess anymore
-#                 if targetState.isSingleGood():
-#                     if state.getDesignError() ==1:
-#                         targetState.setDesignError(0)
-#                         targetState = etDFA.addNode(targetState)
-#                         etDFA.changeEdgeTarget(edge, targetState, True)
-#                     elif state.getDesignError() ==2:
-#                         targetState.setDesignError(1)
-#                         targetState = etDFA.addNode(targetState)
-#                         etDFA.changeEdgeTarget(edge, targetState, True)
+                targetState = ErrorTrackingNode(edge.getTargetNode())
 
-#                     targetState.setDesignError(0)
-#                     targetState = etDFA.addNode(targetState)
-#                     etDFA.changeEdgeTarget(edge, targetState, True)
-                #Case 2: At least one TargetSState is ok, remove errorState from TargetState
-#                 elif not targetState.isOnlyFinal() and targetState.getSubNodeNum()>1:
-#                     targetState.removeFinalSubNodes()
-#                     targetState = etDFA.addNode(targetState)
-#                     if targetState.getSubNodeNum()==1:
-#                         targetState.setDesignError(1)
-#                     else:
-#                         targetState.setDesignError(2)
-#                     targetState.setDesignError(2)
-#                     etDFA.changeEdgeTarget(edge, targetState, True)
-                    
-#                 if targetState.isSubNodeFinal():
-#                     #Case 2: if any node is error, keep guessing this error node by replace it with abstract nodes
-#                     #until reach burst tolerate bound
-#                     if state.getDesignError() >= self.numDesignBurst:
-#                         etDFA.changeEdgeTarget(edge, errorState, True)
-#                     
-#                     else:
-#                     # or else go to any targetState possible with the same input vars
-#                         newTargetState = ErrorTrackingNode()
-#                         label = edge.getLabel()
-#                         edges2 =  state.getOutgoingEdges()
-#                         for edge2 in edges2:
-#                             targetState2 = edge2.getTargetNode()
-#                             label2 = edge2.getLabel()
-#                             if etDFA.checkInputCompatibility(label, label2):
-#                                 #go to targetState2
-#                                 for i in range(0,targetState2.getSubNodeNum()):
-#                                     if not targetState2.getSubNode(i).isFinal():
-#                                         newTargetState.appendSubNode(targetState2.getSubNode(i))
-#     #                     if newTargetState.getSubNodeNum() == 1:
-#     #                         newTargetState.setDesignError(1)
-#     #                     else:
-#     #                         newTargetState.setDesignError(2)
-#                         k=1
-#                         while True:                                           
-#                             newTargetState.setDesignError(k)     
-#                             if newTargetState in etDFA.getNodes() or k == state.getDesignError()+1:
-#                                 newTargetState = etDFA.addNode(newTargetState)
-#                                 etDFA.changeEdgeTarget(edge, newTargetState, True)
-#                                 if not newTargetState in done and not newTargetState in workset:
-#                                     #newTargetState = etDFA.addNode(newTargetState)
-#                                     workset.append(newTargetState)  
-#                                 break
-#                             k=k+1
-#    
-#                 #Case 3: all good state, still guessing the next step
-# #                 elif not targetState.isSubNodeFinal() and state.getDesignError() > 0:
-# #                     targetState.setDesignError(0)
-# #                     targetState = etDFA.addNode(targetState)
-# #                     etDFA.changeEdgeTarget(edge, targetState, True)
-# #                     if not targetState in done and not targetState in workset:
-# #                             workset.append(targetState)
-#                 else:
-#                     targetState.setDesignError(0)
-#                     targetState = etDFA.addNode(targetState)
-#                     etDFA.changeEdgeTarget(edge, targetState, True)
-#                     if not targetState in done and not targetState in workset:
-#                             workset.append(targetState)
-#                     
-              
-#             edges =  state.getOutgoingEdges()
-#             for edge in edges:
-#                 targetState = ErrorTrackingNode(edge.getTargetNode())
-# 
-#                 if targetState.isOnlyFinal():
-#                     #Case 2: If all TargetSStates are errorStates, and designError is 0, set designError to numShieldDeviations_
-#                     
-#                     #go to any targetState possible with the same input vars
-#                     newTargetState = ErrorTrackingNode()
-#                     label = edge.getLabel()
-#                     edges2 =  state.getOutgoingEdges()
-#                     for edge2 in edges2:
-#                         targetState2 = edge2.getTargetNode()
-#                         if not targetState2.isOnlyFinal():
-#                             label2 = edge2.getLabel()
-#                             if etDFA.checkInputCompatibility(label, label2):
-#                                 #go to targetState2
-#                                 for i in range(0,targetState2.getSubNodeNum()):
-#                                     newTargetState.appendSubNode(targetState2.getSubNode(i))
-# #                     if newTargetState.getSubNodeNum() == 1:
-# #                         newTargetState.setDesignError(1)
-# #                     else:
-# #                         newTargetState.setDesignError(2)
-#                     newTargetState.setDesignError(2)
-#                     newTargetState = etDFA.addNode(newTargetState)
-#                     etDFA.changeEdgeTarget(edge, newTargetState, True)
-#                     if not newTargetState in done and not newTargetState.isOnlyFinal() and not newTargetState in workset:
-#                         #newTargetState = etDFA.addNode(newTargetState)
-#                         workset.append(newTargetState)
-#               
-#                 else:                    
-#                     if not targetState in done and not targetState in workset:
-#                         targetState = etDFA.addNode(targetState)
-#                         workset.append(targetState)
+                #Case 1: At least one TargetSState is ok, remove errorState from TargetState
+                if not targetState.isOnlyFinal():
+                    targetState.removeFinalSubNodes()
+                    targetState = etDFA.addNode(targetState)
+                    etDFA.changeEdgeTarget(edge, targetState, True)
+
+            edges =  state.getOutgoingEdges()
+            for edge in edges:
+                targetState = ErrorTrackingNode(edge.getTargetNode())
+
+                if targetState.isOnlyFinal():
+                    #Case 2: If all TargetSStates are errorStates, and designError is 0, set designError to numShieldDeviations_
+                    if state.getDesignError() <= 1:
+                        #go to any targetState possible with the same input vars
+                        newTargetState = ErrorTrackingNode()
+                        label = edge.getLabel()
+                        edges2 =  state.getOutgoingEdges()
+                        for edge2 in edges2:
+                            targetState2 = edge2.getTargetNode()
+                            if not targetState2.isOnlyFinal():
+                                label2 = edge2.getLabel()
+                                if etDFA.checkInputCompatibility(label, label2):
+                                    #go to targetState2
+                                    for i in range(0,targetState2.getSubNodeNum()):
+                                        newTargetState.appendSubNode(targetState2.getSubNode(i))
+
+                        newTargetState.setDesignError(self.numShieldDeviations_)
+                        newTargetState = etDFA.addNode(newTargetState)
+                        etDFA.changeEdgeTarget(edge, newTargetState, True)
+                        if not newTargetState in done and not newTargetState.isOnlyFinal() and not newTargetState in workset:
+                            newTargetState = etDFA.addNode(newTargetState)
+                            workset.append(newTargetState)
+                    else:
+                        #Case 3: Go to error State, and stay there forever
+                        etDFA.changeEdgeTarget(edge, errorState, True)
+                else:
+                    if not targetState in done and not targetState in workset:
+                        targetState = etDFA.addNode(targetState)
+                        workset.append(targetState)
         
-        print "iteration number for etDFA:"+str(iter_num)
         
+#         print "iteration number for etDFA:"+str(iter_num)
         etDFA.setInputVars(self.specDfa_.getInputVars()+self.specDfa_.getOutputVars())
         etDFA.setOutputVars([])
 
-        #self.updateNodeFlags(etDFA) 
+        #self.updateNodeFlags(etDFA)
         #print("1) Final Error Tracking DFA")
         #etDFA.debugPrintDfa(True)
-        etDFA = etDFA.standardization()
-        return etDFA
-            
- 
-   
+        self.etDFA_ = etDFA.standardization()
+
     '''
     Creates automata for tracking shield deviations.
 
@@ -327,7 +202,6 @@ class KStabilizingAlgo(object):
     If not, the dfa will be in state 1.
 
     '''
-    #FIXME: just build deviation monitor for spec_dfa, cause this shield only change the output for current spec property 
     def buildShieldDeviationAutomaton(self):
 
         #input vars consist of outputs of design and outputs of shield
@@ -337,9 +211,8 @@ class KStabilizingAlgo(object):
             self.sdDFA_.setVarName(varNr, self.specDfa_.getVarName(varNr))
 
         #output of shield = copies of spec outputs
-        numDesignOutVars = self.specDfa_.getVarNum()
         for varNr in self.specDfa_.getOutputVars():
-            shieldVarNr = varNr + numDesignOutVars
+            shieldVarNr = varNr + self.specDfa_.getVarNum()
             shieldVarName = self.specDfa_.getVarName(varNr) + "__1"
             self.sdDFA_.addOutputVar(shieldVarNr)
             self.sdDFA_.setVarName(shieldVarNr, shieldVarName)
@@ -402,8 +275,8 @@ class KStabilizingAlgo(object):
 
         literals = []
 
-        for designNr in self.finalDFA_.getOutputVars():
-            shieldNr = designNr+self.finalDFA_.getVarNum()
+        for designNr in self.specDfa_.getOutputVars():
+            shieldNr = designNr+self.specDfa_.getVarNum()
             if designNr in subset:
                 literals.append(designNr*-1)
                 literals.append(shieldNr*-1)
@@ -416,9 +289,8 @@ class KStabilizingAlgo(object):
     '''
     Creates automata that ensures correctness of the shield.
 
-    This automaton corresponds to the spec-automaton and design automaton, 
-    but all occurrence of an design output oi renamed by the corresponding 
-    shield output oi'.
+    This automaton corresponds to the spec-automaton, but all occurrence
+    of an design output oi renamed by the corresponding shield output oi'.
 
     '''
     def buildShieldCorrectnessAutomaton(self):
@@ -437,15 +309,15 @@ class KStabilizingAlgo(object):
             self.scDFA_.setVarName(shieldVarNr, sieldVarName)
 
         #copy nodes from spec automata
-        for sState in self.specDfa_.getNodes():
-            state = DfaNode(sState)
+        for specState in self.specDfa_.getNodes():
+            state = DfaNode(specState)
             if state.isFinal():
                 state.setShieldError(1)
             self.scDFA_.addNode(state, True)
 
         #copy edges from spec automata, alter label
-        for sState in self.specDfa_.getNodes():
-            for specEdge in sState.getOutgoingEdges():
+        for specState in self.specDfa_.getNodes():
+            for specEdge in specState.getOutgoingEdges():
                 specLabel = specEdge.getLabel()
                 #rename output variables from specLabel
                 specInLiterals = self.specDfa_.getInputLiterals(specLabel)
@@ -455,49 +327,10 @@ class KStabilizingAlgo(object):
                 specOutVars = map(abs, specOutLiterals)
                 shieldOutVars = [var + self.specDfa_.getVarNum() for var in specOutVars]
                 shieldOutLiterals = [sign*var for sign,var in zip(signs,shieldOutVars)]
-                
+
                 shieldLabel = DfaLabel(specInLiterals+shieldOutLiterals)
-                
+
                 shieldTarget = self.scDFA_.getNode(specEdge.getTargetNode().getNr())
                 sourceTarget = self.scDFA_.getNode(specEdge.getSourceNode().getNr())
 
                 self.scDFA_.addEdge(sourceTarget, shieldTarget, shieldLabel)
-  
-    '''
-    Creates automata that relax the game automaton using the verified property
-
-    This automaton will copy the design dfa, and change all its outputs to inputs
-    '''
-
-    def buildDesignRelaxAutomaton(self):
-        
-        #inputs = design inputs
-        self.drDFA_.setInputVars(self.designDFA_.getInputVars())
-        for varNr in self.drDFA_.getInputVars():
-            self.drDFA_.setVarName(varNr, self.designDFA_.getVarName(varNr))
-
-        self.drDFA_.setOutputVars(self.designDFA_.getOutputVars())
-        for varNr in self.drDFA_.getOutputVars():
-            self.drDFA_.setVarName(varNr, self.designDFA_.getVarName(varNr))
-            
-        #copy nodes from design automata
-        for sState in self.designDFA_.getNodes():
-            state = DfaNode(sState)
-            if state.isFinal():
-                state.setRelaxError(1)
-            self.drDFA_.addNode(state, True)
-        
-        #copy edges from design automata
-        for sState in self.designDFA_.getNodes():
-            for designEdge in sState.getOutgoingEdges():
-                sLabel = designEdge.getLabel()
-                sTarget = self.drDFA_.getNode(designEdge.getTargetNode().getNr())
-                sSource = self.drDFA_.getNode(designEdge.getSourceNode().getNr())
-
-                self.drDFA_.addEdge(sSource, sTarget, sLabel)
-
-        self.drDFA_.setInputVars(self.designDFA_.getInputVars()+self.designDFA_.getOutputVars())
-        self.drDFA_.setOutputVars([])
-        
-            
-        

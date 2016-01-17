@@ -2,6 +2,9 @@
 Created on Jun 3, 2014
 
 @author: bkoenighofer
+
+@change: 2015/06/04 meng wu: add function to unify multiple dfa
+	
 '''
 
 from datatypes.dfanode import DfaNode
@@ -368,18 +371,6 @@ class DFA(object):
                 resTarget = resDFA.getNode(inputEdge.getTargetNode().getNr())
                 resDFA.addEdge(resSource, resTarget, inputEdge.getLabel())
         return resDFA
-
-
-
-
-
-
-
-
-
-
-
-
 
     '''
     Removes all redundant edges from dfa.

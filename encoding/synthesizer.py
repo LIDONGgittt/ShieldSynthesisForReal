@@ -4,7 +4,7 @@ Created on Jun 10, 2014
 @author: bkoenighofer
 
 @change: 2016/06/11 by mengwu@vt.edu 
-         1. try to synthesis shields by for each property instead of a composed property, make use of previous properties to relax current shield
+         1. 
          2. re-use former non-deterministic strategy: we found safety game strategy is compositional
 '''
 
@@ -16,7 +16,7 @@ from datatypes.dfa import DFA
 from datatypes.productnode import ProductNode
 from datatypes.dfalabel import DfaLabel
 
-FINITE_ERROR_ALGORITHM = 0
+BURST_ERROR_ALGORITHM = 0
 K_STABILIZING_ALGORITHM = 1
 
 NUSMV = 0
@@ -32,18 +32,22 @@ class Synthesizer(object):
     these properties, so they can be used to relax the synthesis.  
     '''
 
-    def __init__(self, algorithm, num_shield_deviations, fast):
+    def __init__(self, algorithm, num_shield_para, fast):
         #print ("======================================\n synthesis  \n======================================\n")
         #init pycudd
         self.mgr_ = pycudd.DdManager()
         self.mgr_.SetDefault()
 
         #init member vars
+        self.num_design_error_ = 0
+        self.num_shield_deviations_ = 1
+        
         self.algorithm_ = algorithm
-        self.num_shield_deviations_ = num_shield_deviations
-        self.allowed_design_error_ = 1
-
-        self.loop_count = 0
+        if self.algorithm_ == BURST_ERROR_ALGORITHM:
+            self.num_design_error_ = num_shield_para
+        else:
+            self.num_shield_deviations_ = num_shield_para
+            
 
         self.input_vars_ = []
         self.output_vars_ = []
@@ -55,20 +59,16 @@ class Synthesizer(object):
         self.var_bdds_ = dict()
 
         self.isFast = fast
-        
-        self.partial_strategy = self.mgr_.One()
 
-    def inc_loop(self):
-        self.loop_count += 1  # synthesis loop increase by 1
     
     def synthesize(self, error_tracking_dfa, deviation_dfa, correctness_dfa):
         
         if self.isFast:
-            self.synthesize_comp(error_tracking_dfa, deviation_dfa, correctness_dfa)
+            self.synthesize_imp(error_tracking_dfa, deviation_dfa, correctness_dfa)
         else:
-            self.synthesize_non_comp(error_tracking_dfa, deviation_dfa, correctness_dfa)
+            self.synthesize_non_imp(error_tracking_dfa, deviation_dfa, correctness_dfa)
 
-    def synthesize_comp(self, error_tracking_dfa, deviation_dfa, correctness_dfa):
+    def synthesize_imp(self, error_tracking_dfa, deviation_dfa, correctness_dfa):
    
         synthe_0  = time.time()
         
@@ -155,7 +155,7 @@ class Synthesizer(object):
             self.win_region_ = self.calc_winning_region()
     
             synthe_2 = time.time()
-            print("log: 2nd stage time: " + str(round(synthe_2 - synthe_0,2)))
+#             print("log: 2nd stage time: " + str(round(synthe_2 - synthe_0,2)))
             
             if self.win_region_ != self.mgr_.Zero():
                 #print("winning region:")
@@ -202,7 +202,7 @@ class Synthesizer(object):
             
             synthe_1 = time.time()
             
-            print("log: 1st stage time: " + str(round(synthe_1 - synthe_0,2)))
+#             print("log: 1st stage time: " + str(round(synthe_1 - synthe_0,2)))
             #calculate winning region
             self.win_region_ = self.calc_winning_region()
     
@@ -248,7 +248,7 @@ class Synthesizer(object):
             self.win_region_ = self.not_error_state_bdd
     
             synthe_2 = time.time()
-            print("log: 2nd stage time: " + str(round(synthe_2 - synthe_1,2)))
+#             print("log: 2nd stage time: " + str(round(synthe_2 - synthe_1,2)))
             
             if self.win_region_ != self.mgr_.Zero():
                 #print("winning region:")
@@ -271,10 +271,10 @@ class Synthesizer(object):
         self.func_by_var_ = self.extract_output_funcs(non_det_strategy)
         
         synthe_3 = time.time()
-        print("log: 3rd stage time: " + str(round(synthe_3 - synthe_2,2)))
+#         print("log: 3rd stage time: " + str(round(synthe_3 - synthe_2,2)))
             
 
-    def synthesize_non_comp(self, error_tracking_dfa, deviation_dfa, correctness_dfa):
+    def synthesize_non_imp(self, error_tracking_dfa, deviation_dfa, correctness_dfa):
         
         
         synthe_0 = time.time()
@@ -346,7 +346,7 @@ class Synthesizer(object):
         self.create_error_states()
         
         synthe_1 = time.time()
-        print("log: 1st stage time: " + str(round(synthe_1 - synthe_0,2)))
+#         print("log: 1st stage time: " + str(round(synthe_1 - synthe_0,2)))
         
         #calculate winning region
         self.win_region_ = self.calc_winning_region()
@@ -365,7 +365,7 @@ class Synthesizer(object):
             return
         
         synthe_2 = time.time()
-        print("log: 2nd stage time: " + str(round(synthe_2 - synthe_1,2)))
+#         print("log: 2nd stage time: " + str(round(synthe_2 - synthe_1,2)))
         
     def getWinStateNum(self):
         self.winStateNum = 0

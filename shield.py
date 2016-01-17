@@ -3,20 +3,14 @@
 '''
 shield -- shielded synthesis tool
 
-shield is the first shield synthesize tool.
+shield is the a shield synthesize tool based on the tool of shield synthesis tool by Bettina Könighofer and Robert Könighofer.
 
-It defines classes_and_methods
+extension of original tool to handle burst errors, and an algorithm to simplify winning region computation
 
-@author:     Bettina Könighofer, Robert Könighofer
+@author:     Meng Wu
 
-@copyright:  2014 IAIK, Graz University of Technology. All rights reserved.
+@contact:    mengwu@vt.edu
 
-@license:    license
-
-@contact:    bettina.koennighofer@iaik.tugraz.at, robert.koenighofer@iaik.tugraz.at
-
-@change: 2015/06/11 by mengwu@vt.edu
-         implement of our new idea to compositionally synthesis the shield
 '''
 
 import sys
@@ -29,17 +23,18 @@ from checker.nusmv import NuSMV
 from checker.vis import VIS
 
 from parser.dfaparser import DfaParser
-from algorithm.finiteDesignErrorAlgo import FiniteDesignErrorAlgo
 from algorithm.kStabilizingAlgo import KStabilizingAlgo
+from algorithm.burstErrorAlgo import BurstErrorAlgo
 from encoding.synthesizer import  Synthesizer
+from encoding.synthesizer_old import  Synthesizer_kstab
 from encoding.svmencoder import SMVEncoder
 from encoding.verilogencoder import VerilogEncoder
 from datatypes.dfa import DFA
 
 __all__ = []
-__version__ = 0.1
-__date__ = '2014-06-03'
-__updated__ = '2014-06-04'
+__version__ = 0.11
+__date__ = '2015-06-05'
+__updated__ = '2016-01-19'
 
 DEBUG = 0
 TESTRUN = 0
@@ -49,7 +44,7 @@ SMV = 0
 VERILOG = 1
 AUTOMATON = 2
 
-FINITE_ERROR_ALGORITHM = 0
+BURST_ERROR_ALGORITHM = 0
 K_STABILIZING_ALGORITHM = 1
 
 MAX_DEVIATIONS = 3
@@ -81,7 +76,7 @@ def main(argv=None): # IGNORE:C0111
     program_license = '''%s
 
   Created on %s.
-  Copyright 2014 IAIK, Graz University of Technology. All rights reserved.
+  Copyright 2015, Virginia Polytechnic Institute and State University. All rights reserved.
 
   Distributed on an "AS IS" basis without warranties
   or conditions of any kind, either express or implied.
@@ -95,33 +90,14 @@ USAGE
     try:
         # Setup argument parser
         parser = ArgumentParser(description=program_license, formatter_class=RawDescriptionHelpFormatter)
-#         parser.add_argument("-a", "--algorithm", dest="algorithm", help="Used algorithm to synthesize shield. Support fealgo (finite design error algorithm) or ksalgo (k-stabilizing algorithm. [default: ksalgo]", default="ksalgo")
+        parser.add_argument("-a", "--algorithm", dest="algorithm", help="Used algorithm to synthesize shield. Support ksalgo (k-stabilizing algorithm) or bealgo (burst error algorithm. [default: bealgo]", default="bealgo")
 #         parser.add_argument("-d", "--design", dest="design", help="concrete design to be load (written as automaton or in verilog)")
 #         parser.add_argument("-e", "--encoding", dest="encoding", help="encoding format of the output file. Support verilog or smv. [default: smv]", default="smv")
 #         parser.add_argument("-v", "--visspec", dest="visspec", help="specification input file for VIS model checker")
         parser.add_argument('-V', '--version', action='version', version=program_version_message)
-        parser.add_argument('-f', '--fastSynthesis', dest='fast', action='store_true', help='compute winning region using implication.', default=False)
-        parser.add_argument("-dev", "--deviation", dest="deviation", help="override the allowed deviation(assigned to 1 means must be greater than 1).[default: 1]", type=int, default=1)
+        parser.add_argument('-f', '--fastSynthesis', dest='fast', action='store_true', help='compute winning region using implication. Only valid when algorithm is set to bealgo.', default=False)
+        parser.add_argument("-dev", "--deviation", dest="deviation", help="override the allowed deviation(assigned to 1 means must be greater than 1). Only valid when algorithm is set to ksalgo.[default: 1]", type=int, default=1)
         parser.add_argument('spec_file', nargs='+')
-
-        #4 possible options to run the program:
-        #
-        #Case 1: Input: Spec automaton
-        #        Output: Shield in SMV
-        #        Arguments: spec_filename
-        #
-        #Case 2: Input: Spec automaton, Design Automaton:
-        #        Output: SMV File with Main, Shield, and Design Module, Verification Result from NuSMV,
-        #        Arguments: -d design_filename spec_filename
-        #
-        #Case 3: Input: Spec automaton
-        #        Output: Shield in Verilog;
-        #        Arguments: -e verilog spec_filename
-        #
-        #Case 4: Input: Spec automaton, Design Module in Verilog, VIS Spec File in LTL;
-        #        Output: Verilog File with Main, Shield and Design Module, Verification Result from VIS,
-        #        Arguments: -d design_filename -v visspec_filename -e verilog spec_filename
-
 
         # Process arguments
         args = parser.parse_args()
@@ -130,37 +106,40 @@ USAGE
 #             parser.print_usage()
 #             print("ERROR: ENCODING has to be 'smv' or 'verilog'!")
 #             sys.exit(-1)
-            
-#         if not args.algorithm == "fealgo" and not args.algorithm == "ksalgo":
-#             parser.print_usage()
-#             print("ERROR: ALGORITHM has to be 'fealgo' or 'ksalgo'!")
-#             sys.exit(-1)
-#         
-
+                        
            
-        if args.deviation >0:
-            allowed_dev = args.deviation
-        else:
-            parser.print_usage()
-            print("ERROR: DEVIATION has to be greater than 1!")
-            sys.exit(-1)
-        
         encoding = VERILOG
 #         if args.encoding=="verilog":
 #             encoding = VERILOG
-
-        shield_algorithm = K_STABILIZING_ALGORITHM
-#         if args.algorithm=="fealgo":
-#             shield_algorithm = FINITE_ERROR_ALGORITHM
-
-        fast_syn = False  
-        if args.fast:
-            fast_syn = True  
-            shield_algorithm = K_STABILIZING_ALGORITHM  # FIXME: for compositional synthesis, block finite_error algorithm
+        shield_algorithm = BURST_ERROR_ALGORITHM
+        fast_syn = False
+        
+        if args.algorithm == "bealgo":
+            if args.deviation >1:
+                print("Warning: deviation option has no effect in burst error algorithm!")
+            if args.fast:
+                fast_syn = True  
+        
+        elif args.algorithm == "ksalgo":
+            shield_algorithm = K_STABILIZING_ALGORITHM
+            if args.deviation >0:
+                allowed_dev = args.deviation
+            else:
+                parser.print_usage()
+                print("ERROR: DEVIATION has to be greater than 1!")
+                sys.exit(-1)
+            if args.fast:
+                print("Warning: right now fastSynthesis option is not supported in k-stabilizing algorithm!")    
+        else:
+            parser.print_usage()
+            print("ERROR: ALGORITHM has to be 'bealgo' or 'ksalgo'!")
+            sys.exit(-1)         
+        
             
         spec_files = args.spec_file
         design_dfa = None
         design_present = True
+        
 #         if not args.design:
 #             design_present = False
 #         else:
@@ -221,28 +200,28 @@ USAGE
     else:
         print("** Output File in SMV Format")
 
-    if shield_algorithm == FINITE_ERROR_ALGORITHM:
-        print("** Used Synthesis Algorithm: Finite-Design-Error Algorithm")
+    if shield_algorithm == K_STABILIZING_ALGORITHM:
+        print("** Used Synthesis Algorithm: K-stabilizing Algorithm")
     else:
-        print("** Used Synthesis Algorithm: k-stabilizing Shield Algorithm")
+        print("** Used Synthesis Algorithm: Burst Error Algorithm")
 
-    if encoding == SMV and not design_present:
-        print("** No design file specified. No verification with NuSMV")
+#     if encoding == SMV and not design_present:
+#         print("** No design file specified. No verification with NuSMV")
 
-    if encoding == VERILOG and (not visspec_present or not design_present):
-        print("** No VIS Specification or Design file present. No verification with VIS")
-    
+#     if encoding == VERILOG and (not visspec_present or not design_present):
+#         print("** No VIS Specification or Design file present. No verification with VIS")
+#     
     if fast_syn:
-        print("** Use implication to compute winning strategy")
+        print("** Use implication to compute winning region")
     else:
-        print("** Use standard algorithm to compute winning strategy")
+        print("** Use standard algorithm to compute winning region")
 
     print("** Used specification automaton input files:")
     for spec_file in spec_files:
         print("*** "+ spec_file)
 
     print("************************************************\n")
-
+    print("******************************************")
     #build specification DFA
 
     dfa_parser = DfaParser(args.spec_file[0])   
@@ -261,38 +240,55 @@ USAGE
     # build Correctness Automaton, Error Tracking Automaton and Deviation Automaton
     # and synthesize output functions for shield
     allowed_burst = 0
-    if shield_algorithm == K_STABILIZING_ALGORITHM:
-        algorithm = KStabilizingAlgo(spec_dfa, allowed_dev, allowed_burst)
-    else:
-        print 'This version does not support Finite Design Error algorithm'
-        return
-        #algorithm = FiniteDesignErrorAlgo(spec_dfas[0], 1, allowed_dev)
-    automata_time = round(time.time() - t_total,2)
-    print("*** Automaton Construction time: " + str(automata_time) + "        ***")
     
-    if allowed_burst>0:
-    
-        finalNode = algorithm.etDFA_.getFinalNodes()[0]
-    
-        if finalNode.getIncomingEdgesNum()==1:
-            print "This is a perfect shield!"
-        else:
-            print "This is NOT a perfect shield!"
-            
-    synthesis = Synthesizer(shield_algorithm, allowed_dev, fast_syn)
-    synthesis.synthesize(algorithm.etDFA_, algorithm.sdDFA_, algorithm.scDFA_)
-    
-    
-    while not synthesis.existsWinningRegion():
-        print 'Something gose wrong!'
-        return 404
+    if shield_algorithm == BURST_ERROR_ALGORITHM:
+        algorithm = BurstErrorAlgo(spec_dfa, allowed_burst)
+        automata_time = round(time.time() - t_total,2)
+        print("*** Automaton Construction time: " + str(automata_time))
         
-        #synthesis = Synthesizer(shield_algorithm, allowed_dev, algorithm.etDFA_, algorithm.sdDFA_, algorithm.scDFA_, algorithm.drDFA_)
+        if allowed_burst>0:
+            finalNode = algorithm.etDFA_.getFinalNodes()[0]
+            if finalNode.getIncomingEdgesNum()==1:
+                print "This is a perfect shield!"
+            else:
+                print "This is NOT a perfect shield!"
+                
+        synthesis = Synthesizer(shield_algorithm, allowed_burst, fast_syn)
+        synthesis.synthesize(algorithm.etDFA_, algorithm.sdDFA_, algorithm.scDFA_)
+        
+        
+        while not synthesis.existsWinningRegion():
+            print 'ERROR: Winning Region cannot find in burst error algorithm!'
+            sys.exit(404)
+        
+    else:
+        algorithm = KStabilizingAlgo(spec_dfa, allowed_dev)
+
+        cur_time = time.time()
+        automata_time = round(cur_time - t_total,2)
+        pre_time = cur_time
+        print("*** Automaton Construction time for k="+str(allowed_dev)+": "+ str(automata_time))
+        
+        synthesis = Synthesizer_kstab(shield_algorithm, allowed_dev, algorithm.etDFA_, algorithm.sdDFA_, algorithm.scDFA_)
+            
+        while not synthesis.existsWinningRegion():
+            synthesis = None    #give GC time to destroy previous manager instance
+            allowed_dev = allowed_dev + 1
+            if allowed_dev == MAX_DEVIATIONS:
+                print "Killing because of deviation counter = " + str(MAX_DEVIATIONS)
+                sys.exit(99)
+#             print("allowed_dev=" + str(allowed_dev))
     
-
-
-    final_dfa = spec_dfa
-      
+            algorithm = KStabilizingAlgo(spec_dfa, allowed_dev)
+            
+                
+            cur_time = time.time()
+            automata_time = round(cur_time - pre_time,2)
+            pre_time = cur_time
+            print("*** Automaton Construction time for k="+str(allowed_dev)+": "+ str(automata_time))
+            
+            synthesis = Synthesizer_kstab(shield_algorithm, allowed_dev, algorithm.etDFA_, algorithm.sdDFA_, algorithm.scDFA_)
+                  
     #create output file and verify shield
 
     verify = False
@@ -300,78 +296,79 @@ USAGE
     t_verify = 0
     verify_time = 0
     if encoding == SMV:
-        if design_present:
+#         if design_present:
             #Outputfile of the Shield module, the Design module and a Main Module connecting both of them
             #Afterwards, verification with SMV
-            verify = True
-            correctness_dfa = final_dfa.createVerificationDfa()
-            deviation_dfa= algorithm.sdDFA_.createVerificationDfa()
-
-            smv_encoder = SMVEncoder()
-            smv_encoder.addShieldModel(synthesis.getResultModel(encoding), synthesis.getNumOfBits())
-            smv_encoder.addDFA("design", design_dfa)
-            smv_encoder.addDFA("correctness", correctness_dfa)
-            smv_encoder.addDFA("deviation", deviation_dfa)
-            smv_encoder.addDFA("specification", final_dfa)
-            smv_str = smv_encoder.getEncodedData()
-
-            with open(output_file_name+".smv", "w+") as text_file:
-                text_file.write(smv_str)
-
-            t_verify = time.time()
-            smv_checker = NuSMV()
-            result = smv_checker.check(smv_str)
-            verify_time = round(time.time() - t_verify,2)
-        else:
-            #no verification, Output File contains only Shield Module
-            smv_encoder = SMVEncoder()
-            smv_encoder.addShieldModel(synthesis.getResultModel(encoding), synthesis.getNumOfBits())
-            smv_encoder.addDFA("specification", final_dfa)
-            smv_str = smv_encoder.getEncodedData()
-            with open(output_file_name+".smv", "w+") as text_file:
-                text_file.write(smv_str)
+#             verify = True
+#             correctness_dfa = spec_dfa.createVerificationDfa()
+#             deviation_dfa= algorithm.sdDFA_.createVerificationDfa()
+# 
+#             smv_encoder = SMVEncoder()
+#             smv_encoder.addShieldModel(synthesis.getResultModel(encoding), synthesis.getNumOfBits())
+#             smv_encoder.addDFA("design", design_dfa)
+#             smv_encoder.addDFA("correctness", correctness_dfa)
+#             smv_encoder.addDFA("deviation", deviation_dfa)
+#             smv_encoder.addDFA("specification", spec_dfa)
+#             smv_str = smv_encoder.getEncodedData()
+# 
+#             with open(output_file_name+".smv", "w+") as text_file:
+#                 text_file.write(smv_str)
+# 
+#             t_verify = time.time()
+#             smv_checker = NuSMV()
+#             result = smv_checker.check(smv_str)
+#             verify_time = round(time.time() - t_verify,2)
+#         else:
+#             #no verification, Output File contains only Shield Module
+#             smv_encoder = SMVEncoder()
+#             smv_encoder.addShieldModel(synthesis.getResultModel(encoding), synthesis.getNumOfBits())
+#             smv_encoder.addDFA("specification", spec_dfa)
+#             smv_str = smv_encoder.getEncodedData()
+#             with open(output_file_name+".smv", "w+") as text_file:
+#                 text_file.write(smv_str)
+        pass
 
     else: #encoding = VERILOG
         if visspec_present and design_present:
             #Outputfile of the Shield module, the Design module and a Main Module connecting both of them
             #Afterwards, verification with VIS
-            verify = True
-            verilog_encoder = VerilogEncoder(final_dfa)
-            verilog_encoder.addShieldModel(synthesis.getResultModel(encoding), synthesis.getNumOfBits(), synthesis.getTmpCount())
-            verilog_encoder.addDesignModel(verilog_design_str)
-            verilog_str = verilog_encoder.getEncodedData()
-
-            with open(output_file_name+".v", "w+") as text_file:
-                text_file.write(verilog_str)
-
-            t_verify = time.time()
-            vis = VIS()
-            vis.readVerilog(output_file_name+".v")
-            vis.flattenHierarchy()
-            vis.staticOrder()
-            vis.buildPartitionMdds()
-            result = vis.ltlModelCheck(vis_spec)
-            vis.quit()
-            verify_time = round(time.time() - t_verify,2)
+#             verify = True
+#             verilog_encoder = VerilogEncoder(spec_dfa)
+#             verilog_encoder.addShieldModel(synthesis.getResultModel(encoding), synthesis.getNumOfBits(), synthesis.getTmpCount())
+#             verilog_encoder.addDesignModel(verilog_design_str)
+#             verilog_str = verilog_encoder.getEncodedData()
+# 
+#             with open(output_file_name+".v", "w+") as text_file:
+#                 text_file.write(verilog_str)
+# 
+#             t_verify = time.time()
+#             vis = VIS()
+#             vis.readVerilog(output_file_name+".v")
+#             vis.flattenHierarchy()
+#             vis.staticOrder()
+#             vis.buildPartitionMdds()
+#             result = vis.ltlModelCheck(vis_spec)
+#             vis.quit()
+#             verify_time = round(time.time() - t_verify,2)
+            pass
         else:
             #no verification, Output File contains only Shield Module
-            verilog_encoder = VerilogEncoder(final_dfa)
+            verilog_encoder = VerilogEncoder(spec_dfa)
             verilog_encoder.addShieldModel(synthesis.getResultModel(encoding), synthesis.getNumOfBits(), synthesis.getTmpCount())
             verilog_str = verilog_encoder.getEncodedData()
 
             with open(output_file_name+".v", "w+") as text_file:
                 text_file.write(verilog_str)
-    synthesis.inc_loop()
 
     #print final message
     total_time = round(time.time() - t_total,2)
 
-    print("******************************************")
+    
     print("*** Final Spec Automaton:")
-    print("***     num states: " + str(final_dfa.getNodeNum()))
-    print("***     num edges: " + str(final_dfa.getNumEdges()))
-    print("***     num inputs: " + str(len(final_dfa.getInputVars())))
-    print("***     num outputs " + str(len(final_dfa.getOutputVars())))
+    print("***     num states: " + str(spec_dfa.getNodeNum()))
+    print("***     num edges: " + str(spec_dfa.getNumEdges()))
+    print("***     num inputs: " + str(len(spec_dfa.getInputVars())))
+    print("***     num outputs " + str(len(spec_dfa.getOutputVars())))
     if verify:
         print("*** Time for synthesis: " + str(total_time-verify_time))
         print("*** Time for verification: " + str(verify_time))

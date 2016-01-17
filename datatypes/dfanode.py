@@ -25,7 +25,6 @@ class DfaNode(object):
             self.designError_=node.getDesignError()
             self.shieldDeviation_ = node.getShieldDeviation()
             self.shieldError_ = node.getShieldError()
-            self.relaxError_ = node.getRelaxError()
 
         else:
             assert type(node) is IntType
@@ -37,7 +36,6 @@ class DfaNode(object):
             self.designError_=0
             self.shieldDeviation_=0
             self.shieldError_=0
-            self.relaxError_ =0
     def __repr__(self):
         retVal = self.toString(details=True)
         retVal += '\n\t%s' % (str(self.getOutgoingEdges().__repr__()))
@@ -105,12 +103,6 @@ class DfaNode(object):
     def setShieldError(self,shieldError):
         self.shieldError_=shieldError
 
-    def getRelaxError(self):
-        return self.relaxError_
-
-    def setRelaxError(self,relaxError):
-        self.relaxError_= relaxError
-
     def copyErrorStatus(self, node):
         if node.getDesignError()!=0:
             assert self.designError_==0
@@ -121,9 +113,6 @@ class DfaNode(object):
         if node.getShieldError()!=0:
             assert self.shieldError_==0
             self.shieldError_=node.getShieldError()
-        if node.getRelaxError()!=0:
-            assert self.relaxError_==0
-            self.relaxError_=node.getRelaxError()      
     
     def getNr(self):
         return self.NR_
@@ -154,8 +143,6 @@ class DfaNode(object):
             expression+=str(self.shieldError_)
             expression+=","
             expression+=str(self.shieldDeviation_)
-            expression+=","
-            expression+=str(self.relaxError_)         
         expression+=">"
 
         if stateProperty:

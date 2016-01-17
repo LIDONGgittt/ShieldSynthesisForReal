@@ -2,6 +2,8 @@
 Created on Jun 3, 2014
 
 @author: bkoenighofer
+@change: 2015/06/04 mengwu: add function isMultiGood() and isSingleGood()
+
 '''
 
 from types import IntType
@@ -13,7 +15,7 @@ class ErrorTrackingNode(DfaNode):
 
 
     def __hash__(self):
-        return (self.designError_, self.shieldDeviation_, self.shieldError_, self.relaxError_, self.subNodes_).__hash__()
+        return (self.designError_, self.shieldDeviation_, self.shieldError_, self.subNodes_).__hash__()
 
     def __eq__(self,other):
         if self.designError_ != other.designError_:
@@ -26,9 +28,6 @@ class ErrorTrackingNode(DfaNode):
             return False
 
         if self.subNodes_ != other.subNodes_:
-            return False
-        
-        if self.relaxError_ != other.relaxError_:
             return False
 
         return True
@@ -45,7 +44,6 @@ class ErrorTrackingNode(DfaNode):
             self.designError_=eTNode.getDesignError()
             self.shieldDeviation_ = eTNode.getShieldDeviation()
             self.shieldError_ = eTNode.getShieldError()
-            self.relaxError_ = eTNode.getRelaxError()
             self.incomingEdges_=list(eTNode.incomingEdges_)
             self.outgoingEdges_=list(eTNode.outgoingEdges_)
 
@@ -57,7 +55,6 @@ class ErrorTrackingNode(DfaNode):
             self.designError_=0
             self.shieldDeviation_=0
             self.shieldError_=0
-            self.relaxError_ =0
             self.incomingEdges_=[]
             self.outgoingEdges_=[]
 
@@ -137,8 +134,6 @@ class ErrorTrackingNode(DfaNode):
             expression+=str(self.shieldError_)
             expression+=","
             expression+=str(self.shieldDeviation_)
-            expression+=","
-            expression+=str(self.relaxError_)
         expression+=">"
 
         if stateProperty:

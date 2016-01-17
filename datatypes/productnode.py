@@ -16,7 +16,7 @@ class ProductNode(DfaNode):
         return (self.hashValue_==other.hashValue_)
 
     def update_hash(self):
-        tuple = (self.designError_, self.shieldDeviation_, self.shieldError_, self.relaxError_)
+        tuple = (self.designError_, self.shieldDeviation_, self.shieldError_)
 
         for node in self.subNodes_:
             tuple=tuple+(node.getNr(),)
@@ -37,7 +37,6 @@ class ProductNode(DfaNode):
             self.designError_=pNode.getDesignError()
             self.shieldDeviation_ = pNode.getShieldDeviation()
             self.shieldError_ = pNode.getShieldError()
-            self.relaxError_ = pNode.getRelaxError()
             self.incomingEdges_=list(pNode.incomingEdges_)
             self.outgoingEdges_=list(pNode.outgoingEdges_)
             self.doneBit_=pNode.doneBit_
@@ -50,7 +49,6 @@ class ProductNode(DfaNode):
             self.designError_=0
             self.shieldDeviation_=0
             self.shieldError_=0
-            self.relaxError_=0
             self.incomingEdges_=[]
             self.outgoingEdges_=[]
             self.doneBit_=False
@@ -95,9 +93,6 @@ class ProductNode(DfaNode):
     def setShieldError(self,shieldError):
         self.shieldError_=shieldError
         self.update_hash()
-    def setRelaxError(self, relaxError):
-        self.relaxError_ =relaxError
-        self.update_hash()
 
     def copyErrorStatus(self, node):
         if node.getDesignError()!=0:
@@ -109,9 +104,6 @@ class ProductNode(DfaNode):
         if node.getShieldError()!=0:
             assert self.shieldError_==0
             self.shieldError_=node.getShieldError()
-        if node.getRelaxError()!=0:
-            assert self.relaxError_==0
-            self.relaxError_=node.getRelaxError()        
         self.update_hash()
 
     def toString(self, details=False, stateProperty = True):
@@ -150,8 +142,6 @@ class ProductNode(DfaNode):
             expression+=str(self.shieldError_)
             expression+=","
             expression+=str(self.shieldDeviation_)
-            expression+=","
-            expression+=str(self.relaxError_)
         expression+=">"
 
         if stateProperty:
