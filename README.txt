@@ -1,6 +1,6 @@
 This archive contains the proof-of-concept implementation as well as all the 
 input files to reproduce the experiments for the CAV'16 paper '???'. Instructions for 
-reproducing the experiments can be found below. It is based on the tool developped by R. Bloem[5] in TACAS 15'
+reproducing the experiments can be found below. It is based on the tool developped by R. Bloem[2] in TACAS 15'
 
 
 Installing the tool:
@@ -20,21 +20,23 @@ make it run, you need to:
 Running our synthesis tool:
 ===========================
  - Open a shell in the directory where you extracted this archive. 
- - Execute
-    > python ./shield.py -h
-   to get a list of command-line arguments.
  - If you only want to synthesize a shield from a safety specification, then
    executing
     > python ./shield.py path/to/spec_automaton.dfa
    should be enough. You can also list several .dfa-files, then the tool
    automatically computes the product automaton. You can also add the option -f 
-   to simplify the winning region computation by using implication. 
+   to simplify the winning region computation by using implication:
+    > python ./shield.py path/to/spec_automaton.dfa -f
  - The safety specification automaton is defined with a very simple textual
    format. This format is described in the file docs/InputFormat.txt.
  - Example input files can be found in the directory 
-   inputfiles/specs/automata/*
-
-
+   inputfiles/*
+ - To run the old too by R. Bloem[2], use option -a ksalgo:
+    > python ./shield.py path/to/spec_automaton.dfa -a ksalgo
+ - More usage of the tool, executing
+    > python ./shield.py -h
+   to get a list of command-line arguments and more help messages.
+ 
 Reproducing the results from the paper:
 =======================================
   
@@ -48,26 +50,22 @@ Guarantee 1 2 and 3 of the ARM AMBA AHB bus controller:
   ************************************************
   * Setup for Shield Synthesis:
   ** Output File in Verilog Format
-  ** Used Synthesis Algorithm: Burst Error Shield Algorithm
-  ** Use standard algorithm to compute winning strategy
+  ** Used Synthesis Algorithm: Burst Error Algorithm
+  ** Use standard algorithm to compute winning region
   ** Used specification automaton input files:
   *** inputfiles/amba/amba_g1.dfa
   *** inputfiles/amba/amba_g2.dfa
   *** inputfiles/amba/amba_g3.dfa
   ************************************************
-
-  log: Size of spec(node/edge): 12/131
-  iteration number for etDFA:22
-  *** Automaton Construction time: 0.05        ***
-  log: 1st stage time: 0.02
-  log: 2nd stage time: 0.03
+  
   ******************************************
+  *** Automaton Construction time: 0.05
   *** Final Spec Automaton:
   ***     num states: 12
   ***     num edges: 131
   ***     num inputs: 4
   ***     num outputs 2
-  *** Total execution time: 0.17
+  *** Total execution time: 0.1
   *** Num wining states: 186/528
   ******************************************
 
@@ -92,9 +90,6 @@ Any questions? Do not hesistate to contact the authors of the paper.
 Have fun!
 
 [1] http://bears.ece.ucsb.edu/pycudd.html
-[2] http://nusmv.fbk.eu/
-[3] http://vlsi.colorado.edu/~vis/
-[4] http://www.eecs.berkeley.edu/~alanmi/abc/
-[5] R. Bloem, B. K¨onighofer, R. K¨onighofer, and C. Wang. Shield synthesis: Runtime enforcement
+[2] R. Bloem, B. K¨onighofer, R. K¨onighofer, and C. Wang. Shield synthesis: Runtime enforcement
 for reactive systems. In International Conference on Tools and Algorithms for Construction
 and Analysis of Systems. Springer, 2015.
