@@ -94,10 +94,9 @@ Specification patterns by Dwyer et al:
 --------------------------------------
 - Here, we executed our tool on the first 10 specification from
 
-  [http://patterns.projects.cis.ksu.edu/documentation/patterns/ltl.shtml]()
+  > [http://patterns.projects.cis.ksu.edu/documentation/patterns/ltl.shtml]()
 
-- The input files can be found in the directory:
-    inputfiles/ltl/
+- The input files can be found in the directory: *inputfiles/ltl/*
 
 - Execute
 
