@@ -47,7 +47,7 @@ AUTOMATON = 2
 BURST_ERROR_ALGORITHM = 0
 K_STABILIZING_ALGORITHM = 1
 
-MAX_DEVIATIONS = 3
+MAX_DEVIATIONS = 4
 
 
 class CLIError(Exception):
@@ -244,8 +244,8 @@ USAGE
     if shield_algorithm == BURST_ERROR_ALGORITHM:
         algorithm = BurstErrorAlgo(spec_dfa, allowed_burst)
         automata_time = round(time.time() - t_total,2)
-        print("*** Automaton Construction time: " + str(automata_time))
-        
+        print("*** ET Automaton Construction time: " + str(automata_time))
+        print("*** ET Automaton Size: " + str(algorithm.etDFA_.getNodeNum())+'/'+str(len(algorithm.etDFA_.getEdges())))
         if allowed_burst>0:
             finalNode = algorithm.etDFA_.getFinalNodes()[0]
             if finalNode.getIncomingEdgesNum()==1:
@@ -255,7 +255,25 @@ USAGE
                 
         synthesis = Synthesizer(shield_algorithm, allowed_burst, fast_syn)
         synthesis.synthesize(algorithm.etDFA_, algorithm.sdDFA_, algorithm.scDFA_)
-        
+#         print "spec:"
+#         print spec_dfa
+#         print "et:"
+#         print algorithm.etDFA_
+#         print "dev:"
+#         print algorithm.sdDFA_
+#         print "correct:"
+#         print algorithm.scDFA_
+#          
+#         print "et and sd:"
+#         et_sd_DFA = algorithm.etDFA_.buildProductOfAutomata(algorithm.sdDFA_, True)
+#         et_sd_DFA = et_sd_DFA.combineUnsafeStates()
+#         et_sd_DFA = et_sd_DFA.standardization(True)
+#         print et_sd_DFA
+#         print "game:"
+#         game_DFA = et_sd_DFA.buildProductOfAutomata( algorithm.scDFA_, True)
+#        game_DFA = game_DFA.combineUnsafeStates()
+#        game_DFA = game_DFA.standardization(True)
+#         print game_DFA
         
         while not synthesis.existsWinningRegion():
             print 'ERROR: Winning Region cannot find in burst error algorithm!'
@@ -268,6 +286,8 @@ USAGE
         automata_time = round(cur_time - t_total,2)
         pre_time = cur_time
         print("*** Automaton Construction time for k="+str(allowed_dev)+": "+ str(automata_time))
+        print("*** ET Automaton Size: " + str(algorithm.etDFA_.getNodeNum())+'/'+str(len(algorithm.etDFA_.getEdges())))
+        
         
         synthesis = Synthesizer_kstab(shield_algorithm, allowed_dev, algorithm.etDFA_, algorithm.sdDFA_, algorithm.scDFA_)
             
@@ -286,9 +306,9 @@ USAGE
             automata_time = round(cur_time - pre_time,2)
             pre_time = cur_time
             print("*** Automaton Construction time for k="+str(allowed_dev)+": "+ str(automata_time))
-            
+            print("*** ET Automaton Size: " + str(algorithm.etDFA_.getNodeNum())+'/'+str(len(algorithm.etDFA_.getEdges())))
             synthesis = Synthesizer_kstab(shield_algorithm, allowed_dev, algorithm.etDFA_, algorithm.sdDFA_, algorithm.scDFA_)
-                  
+            
     #create output file and verify shield
 
     verify = False
@@ -368,7 +388,7 @@ USAGE
     print("***     num states: " + str(spec_dfa.getNodeNum()))
     print("***     num edges: " + str(spec_dfa.getNumEdges()))
     print("***     num inputs: " + str(len(spec_dfa.getInputVars())))
-    print("***     num outputs " + str(len(spec_dfa.getOutputVars())))
+    print("***     num outputs: " + str(len(spec_dfa.getOutputVars())))
     if verify:
         print("*** Time for synthesis: " + str(total_time-verify_time))
         print("*** Time for verification: " + str(verify_time))

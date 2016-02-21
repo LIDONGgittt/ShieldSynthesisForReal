@@ -124,14 +124,13 @@ class Synthesizer_kstab(object):
         if self.win_region_ != self.mgr_.Zero():
             #print("winning region:")
             #self.win_region_.PrintMinterm()
-            self.getWinStateNum()
             
             non_det_strategy = self.get_nondet_strategy(self.win_region_)
             #print ("non-det-strategy")
             #non_det_strategy.PrintMinterm()
-
+            det_strategy = self.get_det_strategy(non_det_strategy)
             #comute next states functions bdd and output functions bdd
-            self.func_by_var_ = self.extract_output_funcs(non_det_strategy)
+            self.func_by_var_ = self.extract_output_funcs(det_strategy)
 
 
     def getResultModel(self, out_format=NUSMV):
@@ -326,7 +325,7 @@ class Synthesizer_kstab(object):
                 return new_set_bdd
 
 
-    def getWinStateNum(self):
+    def getWinStateNum(self, strategy):
         self.winStateNum = 0
         self.allStateNum = len(self.deviation_dfa_.getNodes()) *len(self.error_tracking_dfa_.getNodes()) *len(self.correctness_dfa_.getNodes())
         for dev_state in self.deviation_dfa_.getNodes():
@@ -339,7 +338,7 @@ class Synthesizer_kstab(object):
                     
                     state_bdd = state_bdd_1 & state_bdd_2 &state_bdd_3
 
-                    if (state_bdd & self.win_region_) != self.mgr_.Zero():
+                    if (state_bdd & strategy) != self.mgr_.Zero():
                         self.winStateNum +=1
 
 
@@ -408,6 +407,73 @@ class Synthesizer_kstab(object):
 
         return forall_inputs
 
+
+
+    def get_det_strategy(self,non_det_strategy):
+        
+        # 1. randomly determinize the output
+        output_models = dict()
+        all_outputs = list(self.out_var_bdd_)
+        all_inputs = list(self.in_var_bdds_)
+        all_in_out = all_outputs + all_inputs
+        
+        all_next_state_vars = list(self.next_state_vars_bdd_)
+        all_next_states_and_outputs = all_outputs + all_next_state_vars
+         
+        
+        next_vars_cube = self.prime_states(self.get_cube(self.get_all_state_bdds()))
+        out_var_strategy = non_det_strategy.ExistAbstract(next_vars_cube)
+ 
+        #----------- output functions--------------
+ 
+        for c in self.out_var_bdd_:
+ 
+            others = set(set(all_outputs).difference({c}))
+ 
+            if others:
+                others_cube = self.get_cube(others)
+                #: :type: DdNode
+                c_arena = out_var_strategy.ExistAbstract(others_cube)
+            else:
+                c_arena = out_var_strategy
+ 
+            can_be_true = c_arena.Cofactor(c)  # states (x,i) in which c can be true
+            can_be_false = c_arena.Cofactor(~c)
+ 
+            must_be_true = (~can_be_false) & can_be_true
+            must_be_false = (~can_be_true) & can_be_false
+ 
+            care_set = (must_be_true | must_be_false)
+             
+            c_model = must_be_true.Restrict(care_set)
+            out_var_strategy = out_var_strategy & self.make_bdd_eq(c, c_model)
+            
+            non_det_strategy = non_det_strategy & self.make_bdd_eq(c, c_model)
+        
+        det_strategy = non_det_strategy  #all output has been determinized
+        
+        det_transition = det_strategy.ExistAbstract(self.get_cube(all_in_out))
+        # 2. eliminate unreachable states in strategy
+        self.reachable_state_bdd =  self.mgr_.Zero()
+        new_reachable_state_bdd = self.init_state_bdd_
+        while self.reachable_state_bdd != new_reachable_state_bdd:
+            self.reachable_state_bdd = new_reachable_state_bdd
+            
+            cur_edges = self.reachable_state_bdd & det_transition
+            
+            cur_edges = cur_edges.ExistAbstract(self.get_cube(self.get_all_state_bdds()))
+            
+            new_reachable_state_bdd = self.reachable_state_bdd | (self.unprime_states(cur_edges))
+            
+        det_strategy = det_strategy & self.reachable_state_bdd
+        
+        self.getWinStateNum(det_strategy)
+        return det_strategy
+        
+  
+  
+
+
     def get_nondet_strategy(self,win_region_bdd):
         """ Get non-deterministic strategy from the winning region.
         If the system outputs values that satisfy this non-deterministic strategy, then the system wins.
@@ -423,28 +489,29 @@ class Synthesizer_kstab(object):
         #print "primed_win_region_bdd"
         #primed_win_region_bdd.PrintMinterm()
 
-        intersection = (primed_win_region_bdd & self.transition_bdd_)
+        strategy = (primed_win_region_bdd & self.transition_bdd_) & win_region_bdd
 
         #print "intersection"
         #intersection.PrintMinterm()
 
 
-        next_vars_cube = self.prime_states(self.get_cube(self.get_all_state_bdds()))
-        strategy = intersection.ExistAbstract(next_vars_cube)
+
 
         #print "nondet strategy"
         #print strategy.PrintMinterm()
 
         return strategy
 
-    def extract_output_funcs(self, non_det_strategy):
+    def extract_output_funcs(self, strategy):
         """
         Calculate BDDs for output functions given a non-deterministic winning strategy.
         Cofactor-based approach.
 
         :return: dictionary ``controllable_variable_bdd -> func_bdd``
         """
-
+        next_vars_cube = self.prime_states(self.get_cube(self.get_all_state_bdds()))
+        non_det_strategy = strategy.ExistAbstract(next_vars_cube)
+        
         output_models = dict()
         all_outputs = list(self.out_var_bdd_)
         all_next_state_vars = list(self.next_state_vars_bdd_)
@@ -597,6 +664,35 @@ class Synthesizer_kstab(object):
         replaced_states_bdd = unprimed_states.SwapVariables(curr_var_array, primed_var_array, num_bdds)
 
         return replaced_states_bdd
+
+    def unprime_states(self,primed_states):
+        all_var_bdds=self.var_bdds_.values()
+        num_bdds= len(all_var_bdds)
+
+        #: :type: DdArray
+        curr_var_array = pycudd.DdArray(num_bdds)
+        unprimed_var_array = pycudd.DdArray(num_bdds)
+
+        for l_bdd in all_var_bdds:
+            #: :type: DdNode
+            l_bdd = l_bdd
+            curr_var_array.Push(l_bdd)
+            lit = l_bdd.NodeReadIndex()
+
+            #range of current state bits, is moved by len of state field
+            if self.num_of_bits_ <= lit < self.num_of_bits_*2:
+                new_l_bdd = self.mgr_.IthVar(lit-self.num_of_bits_)
+            else:
+                new_l_bdd = l_bdd
+
+            unprimed_var_array.Push(new_l_bdd)
+
+        replaced_states_bdd = primed_states.SwapVariables(curr_var_array, unprimed_var_array, num_bdds)
+
+        return replaced_states_bdd
+
+
+
 
     def make_node_state_bdd(self,nodeNr, dfa):
 

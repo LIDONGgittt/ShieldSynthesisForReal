@@ -47,27 +47,28 @@ Guarantee 1 2 and 3 of the ARM AMBA AHB bus controller:
   to synthesize a shield for this example. The result will be written to the file output/amba_g1_amba_g2_amba_g3.v
 
   An example output should be like:
-  ************************************************
-  * Setup for Shield Synthesis:
-  ** Output File in Verilog Format
-  ** Used Synthesis Algorithm: Burst Error Algorithm
-  ** Use standard algorithm to compute winning region
-  ** Used specification automaton input files:
-  *** inputfiles/amba/amba_g1.dfa
-  *** inputfiles/amba/amba_g2.dfa
-  *** inputfiles/amba/amba_g3.dfa
-  ************************************************
-  
-  ******************************************
-  *** Automaton Construction time: 0.05
-  *** Final Spec Automaton:
-  ***     num states: 12
-  ***     num edges: 131
-  ***     num inputs: 4
-  ***     num outputs 2
-  *** Total execution time: 0.1
-  *** Num wining states: 186/528
-  ******************************************
+************************************************
+* Setup for Shield Synthesis:
+** Output File in Verilog Format
+** Used Synthesis Algorithm: Burst Error Algorithm
+** Use standard algorithm to compute winning region
+** Used specification automaton input files:
+*** inputfiles/amba/amba_g1.dfa
+*** inputfiles/amba/amba_g2.dfa
+*** inputfiles/amba/amba_g3.dfa
+************************************************
+
+******************************************
+*** ET Automaton Construction time: 0.05
+*** ET Automaton Size: 22/260
+*** Final Spec Automaton:
+***     num states: 12
+***     num edges: 131
+***     num inputs: 4
+***     num outputs: 2
+*** Total execution time: 0.11
+*** Num wining states: 22/528
+******************************************
 
 Specification patterns by Dwyer et al:
 --------------------------------------
