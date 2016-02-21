@@ -18,11 +18,9 @@ make it run, you need to:
    LD_LIBRARY_PATH and PYTHONPATH environment variables. 
    On Bash-like shells you can do this by typing
    
-   ```
-   export PYTHONPATH=$PYTHONPATH:/path_to/pycudd2.0.2/pycudd
+   > `export PYTHONPATH=$PYTHONPATH:/path_to/pycudd2.0.2/pycudd`
 
-   export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/path_to/pycudd2.0.2/cudd-2.4.2/lib
-   ```
+   > `export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/path_to/pycudd2.0.2/cudd-2.4.2/lib`
    
    In order to avoid setting these variables each time, you can also add these
    two lines to the file ~/.bashrc.
@@ -33,12 +31,12 @@ Running our synthesis tool:
  - If you only want to synthesize a shield from a safety specification, then
    executing
 
-   `> python ./shield.py path/to/spec_automaton.dfa`
+   > `> python ./shield.py path/to/spec_automaton.dfa`
    
    should be enough. You can also list several .dfa-files, then the tool
    automatically computes the product automaton. You can also add the option -f 
    to simplify the winning region computation by using implication:
-   `> python ./shield.py path/to/spec_automaton.dfa -f`
+   > `> python ./shield.py path/to/spec_automaton.dfa -f`
 
  - The safety specification automaton is defined with a very simple textual
    format. This format is described in the file docs/InputFormat.txt.
@@ -97,8 +95,10 @@ Specification patterns by Dwyer et al:
 - Here, we executed our tool on the first 10 specification from
 
   [http://patterns.projects.cis.ksu.edu/documentation/patterns/ltl.shtml]()
+
 - The input files can be found in the directory:
     inputfiles/ltl/
+
 - Execute
 
   > `> python ./shield.py inputfiles/ltl/some.dfa [-f]`
