@@ -20,8 +20,10 @@ make it run, you need to:
    
    ```
    export PYTHONPATH=$PYTHONPATH:/path_to/pycudd2.0.2/pycudd
+
    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/path_to/pycudd2.0.2/cudd-2.4.2/lib
    ```
+   
    In order to avoid setting these variables each time, you can also add these
    two lines to the file ~/.bashrc.
  
@@ -37,16 +39,20 @@ Running our synthesis tool:
    automatically computes the product automaton. You can also add the option -f 
    to simplify the winning region computation by using implication:
    `> python ./shield.py path/to/spec_automaton.dfa -f`
+
  - The safety specification automaton is defined with a very simple textual
    format. This format is described in the file docs/InputFormat.txt.
+
  - Example input files can be found in the directory 
    inputfiles/*
+
  - To run the old too by R. Bloem[1], use option -a ksalgo:
- 
-   `> python ./shield.py path/to/spec_automaton.dfa -a ksalgo`
+
+   > `> python ./shield.py path/to/spec_automaton.dfa -a ksalgo`
+
  - More usage of the tool, executing
  
-   `> python ./shield.py -h`
+   > `> python ./shield.py -h`
    
    to get a list of command-line arguments and more help messages.
  
@@ -58,7 +64,7 @@ Guarantee 1 2 and 3 of the ARM AMBA AHB bus controller:
 -----------------------------------------------
 - Execute 
 
-  `>python ./shield.py inputfiles/amba/amba_g1.dfa inputfiles/amba/amba_g2.dfa inputfiles/amba/amba_g3.dfa`
+  > `>python ./shield.py inputfiles/amba/amba_g1.dfa inputfiles/amba/amba_g2.dfa inputfiles/amba/amba_g3.dfa`
    
   to synthesize a shield for this example. The result will be written to the file output/amba_g1_amba_g2_amba_g3.v. An example output should be like:
   
@@ -95,7 +101,7 @@ Specification patterns by Dwyer et al:
     inputfiles/ltl/
 - Execute
 
-  `> python ./shield.py inputfiles/ltl/some.dfa [-f]`
+  > `> python ./shield.py inputfiles/ltl/some.dfa [-f]`
   
    
   to synthesize a shield for the respective property.
