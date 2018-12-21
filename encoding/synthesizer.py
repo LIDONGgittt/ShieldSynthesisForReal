@@ -21,6 +21,7 @@ K_STABILIZING_ALGORITHM = 1
 
 NUSMV = 0
 VERILOG = 1
+ANSIC = 2
 
 class Synthesizer(object):
     '''
@@ -1216,6 +1217,8 @@ class Synthesizer(object):
 
         if out_format == NUSMV:
             self.output_model_ += "  " + c_name + "_1 := " + top_level_var  + ";\n"
+        elif out_format == ANSIC:
+            self.output_model_ += "  " + c_name + " = " + top_level_var  + ";\n"
         else:
             self.output_model_ += "  assign " + c_name + " = " + top_level_var  + ";\n"
 

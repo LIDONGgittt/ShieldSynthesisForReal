@@ -17,6 +17,7 @@ K_STABILIZING_ALGORITHM = 1
 
 NUSMV = 0
 VERILOG = 1
+ANSIC = 2
 
 class Synthesizer_kstab(object):
     '''
@@ -785,12 +786,16 @@ class Synthesizer_kstab(object):
             if a_bdd.IsComplement():
                 ite_lit = "!" + ite_lit
             self.output_model_ += "  " + node_name + " := " + ite_lit + ";\n"
-        else:
-            ite_lit = a_name + " ? " + t_lit  + " : " + e_lit
+        elif out_format == VERILOG:
+            ite_lit = a_name + " ? " + t_lit + " : " + e_lit
             if a_bdd.IsComplement():
                 ite_lit = "~(" + ite_lit + ")"
             self.output_model_ += "  assign " + node_name + " = " + ite_lit + ";\n"
-
+        else:
+            ite_lit = a_name + " ? " + t_lit + " : " + e_lit
+            if a_bdd.IsComplement():
+                ite_lit = "~(" + ite_lit + ")"
+            self.output_model_ += " " + node_name + " = " + ite_lit + ";\n"
         return node_name
 
     def model_to_output_format(self, c_name, c_bdd, func_bdd, out_format):
@@ -808,6 +813,8 @@ class Synthesizer_kstab(object):
 
         if out_format == NUSMV:
             self.output_model_ += "  " + c_name + "_1 := " + top_level_var  + ";\n"
+        elif out_format == ANSIC:
+            self.output_model_ += "  " + c_name + " = " + top_level_var  + ";\n"
         else:
             self.output_model_ += "  assign " + c_name + " = " + top_level_var  + ";\n"
 

@@ -25,9 +25,8 @@ from algorithm.kStabilizingAlgo import KStabilizingAlgo
 from algorithm.burstErrorAlgo import BurstErrorAlgo
 from encoding.synthesizer import  Synthesizer
 from encoding.synthesizer_old import  Synthesizer_kstab
-from encoding.svmencoder import SMVEncoder
+from encoding.ansicencoder import AnsicEncoder
 from encoding.verilogencoder import VerilogEncoder
-
 __all__ = []
 __version__ = 0.11
 __date__ = '2018-12-14'
@@ -39,10 +38,11 @@ PROFILE = 0
 
 SMV = 0
 VERILOG = 1
-AUTOMATON = 2
+ANSIC = 2
 
 BURST_ERROR_ALGORITHM = 0
 K_STABILIZING_ALGORITHM = 1
+REAL_ALGORITHM = 2
 
 MAX_DEVIATIONS = 4
 
@@ -87,9 +87,9 @@ USAGE
     try:
         # Setup argument parser
         parser = ArgumentParser(description=program_license, formatter_class=RawDescriptionHelpFormatter)
-        parser.add_argument("-a", "--algorithm", dest="algorithm", help="Used algorithm to synthesize shield. Support ksalgo (k-stabilizing algorithm) or bealgo (burst error algorithm. [default: bealgo]", default="bealgo")
+        parser.add_argument("-a", "--algorithm", dest="algorithm", help="Used algorithm to synthesize shield. Support ksalgo (k-stabilizing algorithm), bealgo (burst error algorithm or realgo (real domain algorithm). [default: realgo]", default="realgo")
 #         parser.add_argument("-d", "--design", dest="design", help="concrete design to be load (written as automaton or in verilog)")
-#         parser.add_argument("-e", "--encoding", dest="encoding", help="encoding format of the output file. Support verilog or smv. [default: smv]", default="smv")
+        parser.add_argument("-e", "--encoding", dest="encoding", help="encoding format of the output file. Support verilog or ansic. [default: ansic]", default="ansic")
 #         parser.add_argument("-v", "--visspec", dest="visspec", help="specification input file for VIS model checker")
         parser.add_argument('-V', '--version', action='version', version=program_version_message)
         parser.add_argument('-f', '--fastSynthesis', dest='fast', action='store_true', help='compute winning region using implication. Only valid when algorithm is set to bealgo.', default=False)
@@ -99,10 +99,14 @@ USAGE
         # Process arguments
         args = parser.parse_args()
 
-        encoding = VERILOG
-#         if args.encoding=="verilog":
-#             encoding = VERILOG
-        shield_algorithm = BURST_ERROR_ALGORITHM
+        if args.encoding=="verilog":
+            encoding = VERILOG
+        elif args.encoding=="ansic":
+            encoding = ANSIC
+        else:
+            print("ERROR: Unknown encoding!")
+            sys.exit(-1)
+
         fast_syn = False
 
         if args.algorithm == "bealgo":
@@ -121,41 +125,21 @@ USAGE
                 sys.exit(-1)
             if args.fast:
                 print("Warning: right now fastSynthesis option is not supported in k-stabilizing algorithm!")
+        elif args.algorithm == "realgo":
+            shield_algorithm = REAL_ALGORITHM
+            if args.deviation >1:
+                print("Warning: deviation option has no effect in real algorithm!")
+            if args.fast:
+                print("Warning: fastSynthesis option is not supported in real algorithm!")
         else:
             parser.print_usage()
-            print("ERROR: ALGORITHM has to be 'bealgo' or 'ksalgo'!")
+            print("ERROR: Unknown algorithm!")
             sys.exit(-1)
 
 
         spec_files = args.spec_file
-        design_dfa = None
-        design_present = True
-
-#         if not args.design:
-#             design_present = False
-#         else:
-#             design_file =  args.design
-#             #parse design file
-#             if encoding == SMV:   #FIXME: cannot have smv design file and want to produce a verilog output file?
-#                 #design must be an automaton
-#                 dfa_parser = DfaParser(design_file)
-#                 design_dfa = dfa_parser.getParsedDFA()
-#             else:
-#                 #design must be a verilog module
-#                 with open (design_file, "r") as myfile:
-#                     verilog_design_str=myfile.read()
-#
-        visspec_present = False
-#         if args.visspec:
-#             visspec_present = True
-#             vis_spec = args.visspec
-#
-#         if visspec_present and encoding == SMV:
-#             print("\n[WARNIG:] Changed encoding to verilog. Otherwise no verification with VIS possible.\n")
-#             encoding = VERILOG
 
         #output file name is a combination of all input file names
-        output_file_name = ''
         if fast_syn:
             output_file_name="output/f_"
         else:
@@ -167,8 +151,6 @@ USAGE
             input_file_name = input_file_name.split(".")[0]
             output_file_name+=input_file_name+"_"
         output_file_name = output_file_name[:-1]
-
-
 
     except KeyboardInterrupt:
         ### handle keyboard interrupt ###
@@ -188,20 +170,18 @@ USAGE
 
     if encoding == VERILOG:
         print("** Output File in Verilog Format")
-    else:
+    elif encoding == ANSIC:
+        print("** Output File in ANSIC Format")
+    elif encoding == ANSIC:
         print("** Output File in SMV Format")
 
     if shield_algorithm == K_STABILIZING_ALGORITHM:
         print("** Used Synthesis Algorithm: K-stabilizing Algorithm")
-    else:
+    elif shield_algorithm == BURST_ERROR_ALGORITHM:
         print("** Used Synthesis Algorithm: Burst Error Algorithm")
+    else:
+        print("** Used Synthesis Algorithm: Real Algorithm")
 
-#     if encoding == SMV and not design_present:
-#         print("** No design file specified. No verification with NuSMV")
-
-#     if encoding == VERILOG and (not visspec_present or not design_present):
-#         print("** No VIS Specification or Design file present. No verification with VIS")
-#
     if fast_syn:
         print("** Use implication to compute winning region")
     else:
@@ -309,7 +289,7 @@ USAGE
     if encoding == SMV:
         pass
 
-    else: #encoding = VERILOG
+    elif encoding == VERILOG:
         if visspec_present and design_present:
             pass
         else:
@@ -320,9 +300,17 @@ USAGE
 
             with open(output_file_name+".v", "w+") as text_file:
                 text_file.write(verilog_str)
+    else: #encoding = ANSIC
+        ansic_encoder = AnsicEncoder(spec_dfa)
+        ansic_encoder.addShieldModel(synthesis.getResultModel(encoding), synthesis.getNumOfBits(), synthesis.getTmpCount())
+        ansic_str = ansic_encoder.getEncodedData()
+
+        with open(output_file_name+".v", "w+") as text_file:
+            text_file.write(ansic_str)
+
 
     #print final message
-    total_time = round(time.time() - t_total,2)
+    total_time = round(time.time() - t_total, 2)
 
     
     print("*** Final Spec Automaton:")

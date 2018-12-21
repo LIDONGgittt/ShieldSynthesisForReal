@@ -654,7 +654,7 @@ class DFA(object):
             t = time.time()
         prodDFA.simplifyEdges()
         if DEBUG:
-            elapsed_time = round(time.time() - t,2)
+            elapsed_time = round(time.time() - t, 2)
             print("      ....finished in " + str(elapsed_time))
 
 

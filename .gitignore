@@ -6,4 +6,4 @@ output/
 *.pydevproject
 .settings/
 *.*~
-
+.idea/
