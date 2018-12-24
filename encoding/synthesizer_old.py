@@ -136,14 +136,14 @@ class Synthesizer_kstab(object):
 
     def getResultModel(self, out_format=NUSMV):
 
-        #encode output function bdd in verilog or smv
+        #encode output function bdd
         for var_num in self.output_vars_:
             var_bdd = self.var_bdds_["v"+str(var_num-1)]
             var_lit = var_bdd.NodeReadIndex()
-            var_name = self.var_names_[var_lit]
+            var_name = "var->" + self.var_names_[var_lit]
             self.model_to_output_format(var_name, var_bdd, self.func_by_var_[var_bdd], out_format)
 
-        #encode next state function bdd in verilog or smv
+        #encode next state function bdd
         for state_pos in range(0,self.num_of_bits_):
             state_name = 's'+str(self.num_of_bits_-1-state_pos)+'n'
             state_bdd = self.var_bdds_[state_name]
@@ -781,8 +781,11 @@ class Synthesizer_kstab(object):
 
         a_name = self.var_names_[a_lit]
 
+        if a_name in self.in_out_var_names_.values():
+            a_name = "var->"+a_name
+
         if out_format == NUSMV:
-            ite_lit = "((" + a_name + " & " + t_lit  + ") | (!" + a_name + " & " + e_lit +"))"
+            ite_lit = "((" + a_name + " & " + t_lit + ") | (!" + a_name + " & " + e_lit +"))"
             if a_bdd.IsComplement():
                 ite_lit = "!" + ite_lit
             self.output_model_ += "  " + node_name + " := " + ite_lit + ";\n"
@@ -791,11 +794,11 @@ class Synthesizer_kstab(object):
             if a_bdd.IsComplement():
                 ite_lit = "~(" + ite_lit + ")"
             self.output_model_ += "  assign " + node_name + " = " + ite_lit + ";\n"
-        else:
+        else: #out_format == ANSIC:
             ite_lit = a_name + " ? " + t_lit + " : " + e_lit
             if a_bdd.IsComplement():
                 ite_lit = "~(" + ite_lit + ")"
-            self.output_model_ += " " + node_name + " = " + ite_lit + ";\n"
+            self.output_model_ += "  " + node_name + " = " + ite_lit + ";\n"
         return node_name
 
     def model_to_output_format(self, c_name, c_bdd, func_bdd, out_format):
@@ -812,11 +815,11 @@ class Synthesizer_kstab(object):
         top_level_var = self.walk(func_bdd, out_format)
 
         if out_format == NUSMV:
-            self.output_model_ += "  " + c_name + "_1 := " + top_level_var  + ";\n"
+            self.output_model_ += "  " + c_name + "_1 := " + top_level_var + ";\n"
         elif out_format == ANSIC:
-            self.output_model_ += "  " + c_name + " = " + top_level_var  + ";\n"
+            self.output_model_ += "  " + c_name + " = " + top_level_var + ";\n"
         else:
-            self.output_model_ += "  assign " + c_name + " = " + top_level_var  + ";\n"
+            self.output_model_ += "  assign " + c_name + " = " + top_level_var + ";\n"
 
         self.result_model_ += self.output_model_ + "\n"
 

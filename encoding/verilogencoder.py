@@ -105,7 +105,7 @@ class VerilogEncoder(object):
         module_str = ""
         for line in self.designModel_[1:]:
             line = line.strip()
-            line = re.sub(' +',' ',line)
+            line = re.sub(' +', ' ', line)
             if line.startswith("endmodule"):
                 break
             module_str += line + '\n'

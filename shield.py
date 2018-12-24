@@ -305,7 +305,7 @@ USAGE
         ansic_encoder.addShieldModel(synthesis.getResultModel(encoding), synthesis.getNumOfBits(), synthesis.getTmpCount())
         ansic_str = ansic_encoder.getEncodedData()
 
-        with open(output_file_name+".v", "w+") as text_file:
+        with open(output_file_name+".c", "w+") as text_file:
             text_file.write(ansic_str)
 
 
