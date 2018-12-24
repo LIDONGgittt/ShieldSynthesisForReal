@@ -56,10 +56,11 @@ class AnsicEncoder(object):
     def encodeShieldModel(self):
 
         enc = ""
-
         enc += self.encode_header()
         enc += self.encode_variables(self.shieldInputVarNames_, self.shieldOutputVarNames_)
         enc += self.encode_model(self.numOfShieldBits_, self.tmpCount_)
+        enc += self.encode_transit(self.numOfShieldBits_)
+        enc += '  return 0; \n}\n'
         return enc
 
 
@@ -94,23 +95,27 @@ class AnsicEncoder(object):
         return var_enc
 
     def encode_model(self, num_of_bits, tmp_count):
-        mod = 'int func( struct IOVars *var){\n'
+        mod = 'int shield( struct IOVars *var){\n'
 
         # encode temporary variables (wires)
         for statePos in range(0, num_of_bits):
             state_wire = "s" + str(statePos) + "n"
-            mod += "  bool " + state_wire + ";\n"
+            mod += "  bool " + state_wire + " = 0;\n"
 
         for i in range(1, tmp_count):
             tmp_wire = "tmp" + str(i)
-            mod += "  bool " + tmp_wire + ";\n"
+            mod += "  bool " + tmp_wire + " = 0;\n"
 
         # encode regs
         for statePos in range(0, num_of_bits):
             state = "s" + str(statePos)
-            mod += "  bool " + state + ";\n"
+            mod += "  static bool " + state + " = 0;\n"
 
         mod += self.shieldModel_
+        return mod
 
-        mod += '  return 0; \n}\n'
+    def encode_transit(self, num_of_bits):
+        mod = '\n  //encode transition state\n'
+        for statePos in range(0, num_of_bits):
+            mod += "  s" + str(statePos) + " = " "s" + str(statePos) + "n;\n"
         return mod

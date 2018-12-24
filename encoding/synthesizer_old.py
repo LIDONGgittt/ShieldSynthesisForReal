@@ -57,6 +57,7 @@ class Synthesizer_kstab(object):
         self.win_region_ = self.mgr_.Zero()
 
         self.tmp_count_= 1
+        self.max_tmp_count = 1
         self.result_model_ = ""
 
         self.synthesize()
@@ -156,6 +157,8 @@ class Synthesizer_kstab(object):
 
     def getTmpCount(self):
         return self.tmp_count_
+    def getMaxTmpCount(self):
+        return self.max_tmp_count
 
     def existsWinningRegion(self):
         if self.win_region_ != self.mgr_.Zero():
@@ -764,6 +767,7 @@ class Synthesizer_kstab(object):
 
         node_name = "tmp" + str(self.tmp_count_)
         self.tmp_count_ = self.tmp_count_ + 1
+        self.max_tmp_count = max(self.tmp_count_, self.max_tmp_count)
 
         self.visited_[a_bdd] = node_name
         self.bdd_node_counter_ = self.bdd_node_counter_ + 1
@@ -817,6 +821,7 @@ class Synthesizer_kstab(object):
         if out_format == NUSMV:
             self.output_model_ += "  " + c_name + "_1 := " + top_level_var + ";\n"
         elif out_format == ANSIC:
+            self.tmp_count_ = 1
             self.output_model_ += "  " + c_name + " = " + top_level_var + ";\n"
         else:
             self.output_model_ += "  assign " + c_name + " = " + top_level_var + ";\n"

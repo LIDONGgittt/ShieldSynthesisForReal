@@ -290,19 +290,16 @@ USAGE
         pass
 
     elif encoding == VERILOG:
-        if visspec_present and design_present:
-            pass
-        else:
-            #no verification, Output File contains only Shield Module
-            verilog_encoder = VerilogEncoder(spec_dfa)
-            verilog_encoder.addShieldModel(synthesis.getResultModel(encoding), synthesis.getNumOfBits(), synthesis.getTmpCount())
-            verilog_str = verilog_encoder.getEncodedData()
+        #no verification, Output File contains only Shield Module
+        verilog_encoder = VerilogEncoder(spec_dfa)
+        verilog_encoder.addShieldModel(synthesis.getResultModel(encoding), synthesis.getNumOfBits(), synthesis.getTmpCount())
+        verilog_str = verilog_encoder.getEncodedData()
 
-            with open(output_file_name+".v", "w+") as text_file:
-                text_file.write(verilog_str)
+        with open(output_file_name+".v", "w+") as text_file:
+            text_file.write(verilog_str)
     else: #encoding = ANSIC
         ansic_encoder = AnsicEncoder(spec_dfa)
-        ansic_encoder.addShieldModel(synthesis.getResultModel(encoding), synthesis.getNumOfBits(), synthesis.getTmpCount())
+        ansic_encoder.addShieldModel(synthesis.getResultModel(encoding), synthesis.getNumOfBits(), synthesis.getMaxTmpCount())
         ansic_str = ansic_encoder.getEncodedData()
 
         with open(output_file_name+".c", "w+") as text_file:
