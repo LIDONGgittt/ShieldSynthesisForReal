@@ -94,8 +94,9 @@ class DFA(object):
         self.Nodes_=[]
         self.VarNames_=dict()
         
-        self.inputVars_ = [i for i in range(1,numVI+1)]
-        self.outputVars_ = [i for i in range(numVI+1,numVI+numVO+1)]        
+        self.inputVars_ = [i for i in range(1, numVI+1)]
+        self.outputVars_ = [i for i in range(numVI+1, numVI+numVO+1)]
+        self.predicates_ = dict()
         
     def __repr__(self):        
         retVal = self.getPrettyMe()

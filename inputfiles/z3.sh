@@ -1,0 +1,2 @@
+gcc -D_MP_INTERNAL -DNDEBUG -D_EXTERNAL_RELEASE -D_USE_THREAD_LOCAL   -fvisibility=hidden -c -mfpmath=sse -msse -msse2 -fopenmp -O3 -D_LINUX_ -fPIC -D_LINUX_  -o test_capi.o  -I../src/api ../examples/c/test_capi.c
+g++ -o c_example  test_capi.o  libz3.so -lpthread  -fopenmp -lrt

@@ -6,7 +6,6 @@ Created on Jun 3, 2014
 
 from datatypes.dfa import DFA
 from datatypes.dfalabel import DfaLabel
-
 class DfaParser(object):
     '''
     classdocs
@@ -34,7 +33,7 @@ class DfaParser(object):
                 if len(line.strip(' \t').rstrip()) >0:
                     toProcess += line.rstrip()+'\n'
         f.close()
-        
+
         #remove trailing new line
         toProcess=toProcess[0:len(toProcess)-1]
            
@@ -46,27 +45,27 @@ class DfaParser(object):
            
         return dfa
     
-    def createDfaFromDefinition(self,dfaDef):
+    def createDfaFromDefinition(self, dfaDef):
         lines = dfaDef.split('\n') 
         
         dfaParams = lines[0].split(' ')
         
-        if  dfaParams[0] != "dfa":
+        if dfaParams[0] != "dfa":
             raise Exception("syntax error: expect dfa definition in first line. keyword 'dfa' is missing.")
         
         if len(dfaParams) != 7:
             raise Exception("dfa definition expects exactly 6 arguments! found '"+str(len(dfaParams))+"'") 
         
         #create DFA
-        dfa = DFA(int(dfaParams[1]),int(dfaParams[2]),int(dfaParams[3]),int(dfaParams[4]),int(dfaParams[5]),int(dfaParams[6]))
+        dfa = DFA(int(dfaParams[1]), int(dfaParams[2]), int(dfaParams[3]), int(dfaParams[4]), int(dfaParams[5]), int(dfaParams[6]))
 
         #TODO: improve checks for sufficient input lines and that line is really initial/final definition and not an edge by accident. <bk>
         #TODO: not sure if parser can handle all variants of leading and trailing whitespace. be careful at formatting your inputfiles for now. <bk>
         
         #setup edges and create nodes on the fly
         #try to go through all remaining lines. maybe killed of, if letter found as 2nd parameter. then parsing is passed on to var-parsing loop (following below!)         
-        proccesingPosition=3;
-        for i in range(3,len(lines)):
+        proccesingPosition=3
+        for i in range(3, len(lines)):
             proccesingPosition=i    # update start position for variable name definitions
             edgeDef = lines[i].rstrip().split(' ')
             
@@ -109,15 +108,15 @@ class DfaParser(object):
         
                                
         #parse variable name definitions, if present
-        for i in range(proccesingPosition,len(lines)):
+        for i in range(proccesingPosition, len(lines)):
             varDef = lines[i].rstrip().split(' ')
-     
-            if len(varDef)!=2:
-                raise Exception("definition-error: var-name definition invalid. needs exactly 2 parameters found!\n  line:'"+lines[i]+"'")   
-            #TODO: check for positive representation of variable here!
             dfa.setVarName(int(varDef[0]), varDef[1])
-        
-        return dfa      
-    
+
+            if len(varDef)> 2:
+                pre = lines[i]
+                pre = pre[pre.find("(") + 1:pre.rfind(")")]
+                dfa.predicates_[int(varDef[0])] = pre
+        return dfa
+
     def getParsedDFA(self):
         return self.dfa_          

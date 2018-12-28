@@ -36,7 +36,7 @@ dfa 5 4 1 1 1 20
 2 T       #input
 3 l1      #input
 4 l2      #input
-5 u005    #output
+5 u005  ((u < 0.05) & (u > -0.05)) #output
 
 
 
