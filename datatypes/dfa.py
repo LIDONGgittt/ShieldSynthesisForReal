@@ -71,7 +71,9 @@ class DFA(object):
                 u_source = unified_dfa.getNode(egde.getSourceNode().getNr())
                 u_target = unified_dfa.getNode(egde.getTargetNode().getNr())
                 u_label = self.transformLabel(egde.getLabel(), self, DFA.all_var_names_)
-                unified_dfa.addEdge(u_source, u_target, u_label)          
+                unified_dfa.addEdge(u_source, u_target, u_label)
+
+        unified_dfa.predicates_ = self.predicates_
         return unified_dfa       
         
 
@@ -96,7 +98,7 @@ class DFA(object):
         
         self.inputVars_ = [i for i in range(1, numVI+1)]
         self.outputVars_ = [i for i in range(numVI+1, numVI+numVO+1)]
-        self.predicates_ = dict()
+        self.predicates_ = dict()    # pairs of (var name, predicate expression)
         
     def __repr__(self):        
         retVal = self.getPrettyMe()
@@ -246,7 +248,10 @@ class DFA(object):
     
     def getOutputVars(self):
         return list(self.outputVars_)
-        
+
+    def getInOutVars(self):
+        return list(self.inputVars_) + list(self.outputVars_)
+
     def setOutputVars(self, outputVars):
         self.outputVars_=outputVars
     
@@ -371,6 +376,8 @@ class DFA(object):
                 resSource = resDFA.getNode(inputEdge.getSourceNode().getNr())
                 resTarget = resDFA.getNode(inputEdge.getTargetNode().getNr())
                 resDFA.addEdge(resSource, resTarget, inputEdge.getLabel())
+
+        resDFA.predicates_ = self.predicates_
         return resDFA
 
     '''
@@ -545,7 +552,7 @@ class DFA(object):
                     res_label = DfaLabel(literals+[out_var_nr])
 
                 res_dfa.addEdge(res_source, res_target, res_label)
-
+        res_dfa.predicates_ = self.predicates_
         return res_dfa
 
     '''
@@ -572,20 +579,34 @@ class DFA(object):
         #inputs = inputs from dfa1 and dfa2
         prodDFA.setInputVars(c_dfa1.getInputVars())
         for varNr in c_dfa1.getInputVars():
-            prodDFA.setVarName(varNr, c_dfa1.getVarName(varNr))
+            var_name = c_dfa1.getVarName(varNr)
+            prodDFA.setVarName(varNr, var_name)
+            if var_name in c_dfa1.predicates_:
+                prodDFA.predicates_[var_name] = c_dfa1.predicates_[var_name]
 
         prodDFA.addInputVars(c_dfa2.getInputVars())
         for varNr in c_dfa2.getInputVars():
-            prodDFA.setVarName(varNr, c_dfa2.getVarName(varNr))
+            var_name = c_dfa2.getVarName(varNr)
+            prodDFA.setVarName(varNr, var_name)
+            if var_name in c_dfa2.predicates_:
+                prodDFA.predicates_[var_name] = c_dfa2.predicates_[var_name]
+
+
 
         #outputs = outputs from dfa1 and dfa2
         prodDFA.setOutputVars(c_dfa1.getOutputVars())
         for varNr in c_dfa1.getOutputVars():
-            prodDFA.setVarName(varNr, c_dfa1.getVarName(varNr))
+            var_name = c_dfa1.getVarName(varNr)
+            prodDFA.setVarName(varNr, var_name)
+            if var_name in c_dfa1.predicates_:
+                prodDFA.predicates_[var_name] = c_dfa1.predicates_[var_name]
 
         prodDFA.addOutputVars(c_dfa2.getOutputVars())
         for varNr in c_dfa2.getOutputVars():
-            prodDFA.setVarName(varNr, c_dfa2.getVarName(varNr))
+            var_name = c_dfa2.getVarName(varNr)
+            prodDFA.setVarName(varNr, var_name)
+            if var_name in c_dfa2.predicates_:
+                prodDFA.predicates_[var_name] = c_dfa2.predicates_[var_name]
 
         initSubNodes1 = c_dfa1.getInitialNodes()
         initSubNodes2 = c_dfa2.getInitialNodes()
@@ -678,19 +699,38 @@ class DFA(object):
 
         joint_input_vars = set()
         joint_output_vars = set()
+        joint_predicates = dict()
 
         c_var_nrs = dict()
 
         #compute joint input and output variables
         for var_nr in dfa1.getInputVars():
-            joint_input_vars.add(dfa1.getVarName(var_nr))
+            var_name = dfa1.getVarName(var_nr)
+            joint_input_vars.add(var_name)
+            if var_name in dfa1.predicates_:
+                joint_predicates[var_name] = dfa1.predicates_[var_name]
+
         for var_nr in dfa2.getInputVars():
-            joint_input_vars.add(dfa2.getVarName(var_nr))
+            var_name = dfa2.getVarName(var_nr)
+            joint_input_vars.add(var_name)
+            if var_name in dfa2.predicates_:
+                joint_predicates[var_name] = dfa2.predicates_[var_name]
 
         for var_nr in dfa1.getOutputVars():
-            joint_output_vars.add(dfa1.getVarName(var_nr))
+            var_name = dfa1.getVarName(var_nr)
+            joint_output_vars.add(var_name)
+            if var_name in dfa1.predicates_:
+                joint_predicates[var_name] = dfa1.predicates_[var_name]
+
         for var_nr in dfa2.getOutputVars():
-            joint_output_vars.add(dfa2.getVarName(var_nr))
+            var_name = dfa2.getVarName(var_nr)
+            joint_output_vars.add(var_name)
+            if var_name in dfa2.predicates_:
+                joint_predicates[var_name] = dfa2.predicates_[var_name]
+
+        #set predicates
+        c_dfa1.predicates_ = joint_predicates
+        c_dfa2.predicates_ = joint_predicates
 
         #set input and output variables
         var_count = 1
@@ -850,5 +890,5 @@ class DFA(object):
             resultDfa.removeNode(node)
 
         resultDfa.simplifyEdges()
-
+        resultDfa.predicates_ = self.predicates_
         return resultDfa.standardization()

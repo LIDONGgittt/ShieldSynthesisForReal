@@ -115,7 +115,7 @@ class DfaParser(object):
             if len(varDef)> 2:
                 pre = lines[i]
                 pre = pre[pre.find("(") + 1:pre.rfind(")")]
-                dfa.predicates_[int(varDef[0])] = pre
+                dfa.predicates_[varDef[1]] = pre
         return dfa
 
     def getParsedDFA(self):
