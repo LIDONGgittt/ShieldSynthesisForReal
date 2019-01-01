@@ -38,18 +38,18 @@ class KStabilizingAlgo(object):
         self.numShieldDeviations_ = numShieldDeviations
 
         if DEBUG:
-            print( "  start building ErrorTrackingAutomaton...")
+            print("  start building ErrorTrackingAutomaton...")
         self.buildErrorTrackingAutomaton()
         if DEBUG:
-            print( "  ...done")
-            print( "  start building ShieldDeviationAutomaton...")
+            print("  ...done")
+            print("  start building ShieldDeviationAutomaton...")
         self.buildShieldDeviationAutomaton()
         if DEBUG:
-            print( "  ...done")
-            print( "  start building ShieldCorrectnessAutomaton...")
+            print("  ...done")
+            print("  start building ShieldCorrectnessAutomaton...")
         self.buildShieldCorrectnessAutomaton()
         if DEBUG:
-            print( "  ...done")
+            print("  ...done")
 
         #print("1) Final Error Tracking DFA after Standardization")
         #self.etDFA_.debugPrintDfa(True)

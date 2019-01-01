@@ -99,11 +99,14 @@ class DFA(object):
         self.inputVars_ = [i for i in range(1, numVI+1)]
         self.outputVars_ = [i for i in range(numVI+1, numVI+numVO+1)]
         self.predicates_ = dict()    # pairs of (var name, predicate expression)
-        
+
+    def getPredicates(self):
+        return self.predicates_
+
     def __repr__(self):        
         retVal = self.getPrettyMe()
         return retVal
-        
+
     def setInitalStates(self,initialStates):
         for stateNr in initialStates:
             stateNr=int(stateNr)

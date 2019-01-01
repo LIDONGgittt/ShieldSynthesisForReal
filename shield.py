@@ -254,7 +254,7 @@ USAGE
         algorithm = KStabilizingAlgo(spec_dfa, allowed_dev)
 
         cur_time = time.time()
-        automata_time = round(cur_time - t_total,2)
+        automata_time = round(cur_time - t_total, 2)
         pre_time = cur_time
         print("*** Automaton Construction time for k="+str(allowed_dev)+": "+ str(automata_time))
         print("*** ET Automaton Size: " + str(algorithm.etDFA_.getNodeNum())+'/'+str(len(algorithm.etDFA_.getEdges())))

@@ -396,7 +396,7 @@ class Synthesizer(object):
             self.model_to_output_format(var_name, var_bdd, self.func_by_var_[var_bdd], out_format)
 
         #encode next state function bdd in verilog or smv
-        for state_pos in range(0,self.num_of_bits_):
+        for state_pos in range(0, self.num_of_bits_):
             state_name = 's'+str(self.num_of_bits_-1-state_pos)+'n'
             state_bdd = self.var_bdds_[state_name]
             self.model_to_output_format(state_name, state_bdd, self.func_by_var_[state_bdd], out_format)
