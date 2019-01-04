@@ -6,6 +6,8 @@ from datatypes.dfalabel import DfaLabel
 from datatypes.productnode import ProductNode
 from datatypes.errorTrackingNode import ErrorTrackingNode
 from itertools import combinations
+from z3 import *
+from datatypes.predicates import Predicate
 
 import time
 
@@ -32,6 +34,9 @@ class KStabilizingAlgo(object):
         self.sdDFA_ = DFA()
         #Shield Correctness Automaton
         self.scDFA_ = DFA()
+        #Feasibility Automaton
+        self.fsDFA_ = DFA()
+
         #Final Product DFA
         self.finalDFA_ = DFA()
 
@@ -48,6 +53,10 @@ class KStabilizingAlgo(object):
             print("  ...done")
             print("  start building ShieldCorrectnessAutomaton...")
         self.buildShieldCorrectnessAutomaton()
+        if DEBUG:
+            print("  ...done")
+            print("  start building FeasibilityAutomaton...")
+        self.buildFeasibilityAutomaton()
         if DEBUG:
             print("  ...done")
 
@@ -334,3 +343,57 @@ class KStabilizingAlgo(object):
                 sourceTarget = self.scDFA_.getNode(specEdge.getSourceNode().getNr())
 
                 self.scDFA_.addEdge(sourceTarget, shieldTarget, shieldLabel)
+
+    def buildFeasibilityAutomaton(self):
+        #fesibility automaton only has output vars
+        self.fsDFA_.setOutputVars(self.sdDFA_.getOutputVars())
+        self.fsDFA_.setVarName(self.sdDFA_.getVarNames())
+
+        # add first state (no conflicts)
+        stateOne = DfaNode(1)
+        stateOne.setInitial(True)
+        self.fsDFA_.addNode(stateOne, True)
+
+        # add second state (infeasible predicates combinations)
+        stateTwo = DfaNode(2)
+        stateTwo.setFinal(True)
+        self.fsDFA_.addNode(stateTwo, True)
+        self.fsDFA_.addEdge(stateTwo, stateTwo, DfaLabel())
+
+        predicates = self.specDfa_.getPredicates()
+        output_in_predicates = []
+        for varN in self.fsDFA_.getOutputVars():
+            if self.fsDFA_.getVarName(varN) in predicates:
+                output_in_predicates.append(varN)
+
+        for pred in range(0, len(output_in_predicates)+1):
+            for subset in combinations(output_in_predicates, pred):
+                label = self.createLabelFromSubset(subset)
+                if self.isPredicatesFeasible(predicates, subset):
+                    self.fsDFA_.addEdge(stateOne, stateOne, label)
+                else:
+                    self.fsDFA_.addEdge(stateOne, stateTwo, label)
+
+    def isPredicatesFeasible(self, predicates, subset):
+
+        truePred = []
+        for var in subset:
+            truePred.append(predicates[self.fsDFA_.getVarName(var)])
+
+        s = Solver()
+
+        for varName in predicates:
+            predicate_parser = Predicate()
+            predicate_parser.tokenize(predicates[varName])
+            predicate_ast = predicate_parser.parse()
+
+            sat = varName in truePred
+            s.add(predicate_parser.generateConstrain(predicate_ast, sat))
+
+        if s.check() == sat:
+            return True
+        return False
+
+
+
+

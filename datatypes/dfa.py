@@ -215,7 +215,7 @@ class DFA(object):
         return self.VarNames_[varNr]
     
     def setVarNames(self,varlist):
-        self.VarNames_=varlist
+        self.VarNames_ = varlist
         
     def getVarNames(self):
         return dict(self.VarNames_)

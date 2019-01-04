@@ -6,7 +6,7 @@ Created on Dec 27, 2018
 	
 '''
 import re
-
+from z3 import *
 
 class AstNode(object):
     def __init__(self, ty, value):
@@ -188,4 +188,25 @@ class Predicate(object):
         tok = scanner.scan(string)[0]
         self.tokens = iter(scanner.scan(string)[0])
 
+
+    def generateConstrain(self, ast, sat=True):
+
+        constrain = None
+        if ast.getType()==3:
+            left = self.generateConstrain(ast.getLeft())
+            right = self.generateConstrain(ast.getRight())
+            constrain = eval('left' + 'ast.getValue()' + 'right')
+
+        elif ast.getType() == 0:# fix: mk_int_var
+            constrain = Real(ast.getValue())
+
+        elif ast.getType() == 1:
+            constrain = int(ast.getValue())
+        elif ast.getType() == 2:
+            constrain = float(ast.getValue())
+
+        if not sat:
+            constrain = Not(constrain)
+
+        return constrain
 

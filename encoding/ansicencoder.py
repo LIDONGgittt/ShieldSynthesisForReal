@@ -222,8 +222,8 @@ class AnsicEncoder(object):
             ret[1] = 'Z3_mk_or(ctx, 2, args);\n'
         elif op == '%':
             ret[1] = 'Z3_mk_rem(ctx,' + left + ',' + right + ');\n'
-        elif op == 'mod':
-            ret[1] = 'Z3_mk_mod(ctx,'+ left + ',' + right + ');\n'
+        # elif op == 'mod':
+        #     ret[1] = 'Z3_mk_mod(ctx,'+ left + ',' + right + ');\n'
         elif op == '^':
             ret[1] = 'Z3_mk_pow(ctx,'+ left + ',' + right + ');\n'
         elif op == '>':
