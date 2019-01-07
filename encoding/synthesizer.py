@@ -321,7 +321,7 @@ class Synthesizer(object):
 
         #build next state vars
         self.next_state_vars_bdd_ = []
-        for state_pos in range(0,self.num_of_bits_):
+        for state_pos in range(0, self.num_of_bits_):
             self.next_state_vars_bdd_.append(self.var_bdds_['s'+str(self.num_of_bits_-1-state_pos)+'n'])
 
         #build input variables bdds
@@ -368,7 +368,103 @@ class Synthesizer(object):
         
         synthe_2 = time.time()
 #         print("log: 2nd stage time: " + str(round(synthe_2 - synthe_1,2)))
-        
+
+
+    def synthesize_real(self, error_tracking_dfa, deviation_dfa, correctness_dfa, feasibility_dfa):
+
+        synthe_0 = time.time()
+
+        self.init_state_bdd_ = self.mgr_.One()
+        self.transition_bdd_ = self.mgr_.One()
+        self.err_state_bdd_ = self.mgr_.Zero()
+        self.win_region_ = self.mgr_.Zero()
+
+        self.error_tracking_dfa_ = error_tracking_dfa.unify()
+        self.deviation_dfa_ = deviation_dfa.unify()
+        self.correctness_dfa_ = correctness_dfa.unify()
+        self.feasibility_dfa_ = feasibility_dfa.unify()
+
+        self.dfa_list_ = [self.error_tracking_dfa_, self.deviation_dfa_, self.correctness_dfa_, self.feasibility_dfa_]
+
+        self.tmp_count_ = 1
+        self.result_model_ = ""
+        self.num_of_bits_ = 0
+
+        for dfa in self.dfa_list_:
+            # add input vars
+            for input_var in dfa.getInputVars():
+                if input_var not in self.input_vars_:
+                    self.input_vars_.append(input_var)
+                    self.in_out_var_names_[input_var] = dfa.getVarName(input_var)
+            # add output vars
+            for output_var in dfa.getOutputVars():
+                if output_var not in self.output_vars_:
+                    self.output_vars_.append(output_var)
+                    self.in_out_var_names_[output_var] = dfa.getVarName(output_var)
+
+        # encode states and create init_state
+        # (create state bdds for all state bits of all automata)
+        state_order = self.encode_states()
+
+        self.create_init_states(self.dfa_list_)
+        # encode variables
+        var_order = self.encode_variables()
+
+        # build next state vars
+        self.next_state_vars_bdd_ = []
+        for state_pos in range(0, self.num_of_bits_):
+            self.next_state_vars_bdd_.append(self.var_bdds_['s' + str(self.num_of_bits_ - 1 - state_pos) + 'n'])
+
+        # build input variables bdds
+        self.in_var_bdds_ = []
+        for var in self.input_vars_:
+            self.in_var_bdds_.append(self.var_bdds_["v" + str(var - 1)])
+
+        # build output variables bdds
+        self.out_var_bdd_ = []
+        for var in self.output_vars_:
+            self.out_var_bdd_.append(self.var_bdds_["v" + str(var - 1)])
+
+        transition_bdds = []
+        for dfa in self.dfa_list_:
+            transition_bdds.append(self.encode_transitions(dfa))
+
+        # encode final transition relation
+        for transition_bdd in transition_bdds:
+            self.transition_bdd_ &= transition_bdd
+
+        self.create_error_states_real()
+
+        synthe_1 = time.time()
+        #         print("log: 1st stage time: " + str(round(synthe_1 - synthe_0,2)))
+
+        # calculate winning region
+        self.win_region_ = self.calc_winning_region()
+        # print "win_region"
+        # self.win_region_.PrintMinterm()
+
+        if self.win_region_ != self.mgr_.Zero():
+            # print("winning region:")
+            # self.win_region_.PrintMinterm()
+            non_det_strategy = self.get_nondet_strategy(self.win_region_)
+            det_strategy = self.get_det_strategy(non_det_strategy)
+
+            self.func_by_var_ = self.extract_output_funcs(det_strategy)
+
+        else:
+            print 'cannot find wining region for scDFA+drDFA!'
+            return
+
+        synthe_2 = time.time()
+
+    #         print("log: 2nd stage time: " + str(round(synthe_2 - synthe_1,2)))
+
+
+
+
+
+
+
     def getWinStateNum(self, det_strategy):
         self.winStateNum = 0
         self.allStateNum = self.deviation_dfa_.getNodeNum() * self.error_tracking_dfa_.getNodeNum() *self.correctness_dfa_.getNodeNum()
@@ -446,13 +542,13 @@ class Synthesizer(object):
             self.num_of_bits_ = self.num_of_bits_ + num_bits
             num_of_bits_dict[dfa] = num_bits
 
-        self.state_offsets_[self.dfa_list_[0]]=0
+        self.state_offsets_[self.dfa_list_[0]] = 0
         offset = 0
         for i in range(1, len(self.dfa_list_)):
             offset = offset + num_of_bits_dict[self.dfa_list_[i-1]]
-            self.state_offsets_[self.dfa_list_[i]]=offset
+            self.state_offsets_[self.dfa_list_[i]] = offset
 
-        state_order=""
+        state_order = ""
         
         
         self.state_index = len(self.var_bdds_)
@@ -649,6 +745,56 @@ class Synthesizer(object):
         self.not_error_state_bdd = non_error_bdd_1 & non_error_bdd_2
         #print "Error_BDD:"
         #self.err_state_bdd_.PrintMinterm()
+
+    def create_error_states_real(self):
+        # Rules for error states:
+        # 1. Correctness: A state is unsafe, if shieldError_ is true
+        error_bdd_1 = self.mgr_.Zero()
+        non_error_bdd_1 = self.mgr_.Zero()
+
+        for state in self.correctness_dfa_.getNodes():
+
+            state_bdd = self.make_node_state_bdd(state.getNr() - 1, self.correctness_dfa_)
+            if state.getShieldError():
+                error_bdd_1 += state_bdd
+            else:
+                non_error_bdd_1 += state_bdd
+
+        # print "ERROR BDD 1. Correctness: A state is unsafe, if shieldError_ is true"
+        # error_bdd_1.PrintMinterm()
+        # print "=============="
+
+        # 2. No shield-deviation before system error:
+        error_bdd_2 = self.mgr_.Zero()
+        non_error_bdd_2 = self.mgr_.Zero()
+
+        for dev_state in self.deviation_dfa_.getNodes():
+            for et_state in self.error_tracking_dfa_.getNodes():
+
+                state_bdd_1 = self.make_node_state_bdd(dev_state.getNr() - 1, self.deviation_dfa_)
+                state_bdd_2 = self.make_node_state_bdd(et_state.getNr() - 1, self.error_tracking_dfa_)
+                state_bdd = state_bdd_1 & state_bdd_2
+
+                if dev_state.getShieldDeviation() > 0 and et_state.getDesignError() == 0:
+                    error_bdd_2 += state_bdd
+                else:
+                    non_error_bdd_2 += state_bdd
+
+        # print "ERROR BDD 2. No shield-deviation without system error:"
+        # error_bdd_2.PrintMinterm()
+        # print "=============="
+        # 3. Infeasible state in feasibility automata
+        error_bdd_3 = self.mgr_.Zero()
+        non_error_bdd_3 = self.mgr_.Zero()
+        for fs_state in self.feasibility_dfa_.getNodes():
+            state_bdd = self.make_node_state_bdd(fs_state.getNr() - 1, self.feasibility_dfa_)
+            if fs_state.isFinal():
+                error_bdd_3 += state_bdd
+            else:
+                non_error_bdd_3 += state_bdd
+
+        self.err_state_bdd_ = error_bdd_1 + error_bdd_2 + error_bdd_3
+        self.not_error_state_bdd = non_error_bdd_1 & non_error_bdd_2 & non_error_bdd_3
 
     def calc_winning_region(self):
 
@@ -1134,14 +1280,14 @@ class Synthesizer(object):
 
         result = self.mgr_.One()
         j = 1
-        for i in range(0,self.num_of_bits_):
+        for i in range(0, self.num_of_bits_):
             if i >= offset and i < offset + num_bits:
                 sign = bin_str[len(bin_str)-j] #sign of s
-                if int(sign)==1:
+                if int(sign) == 1:
                     result &= self.var_bdds_["s"+str(i)+"n"] #bdd of s
-                elif int(sign)==0:
+                elif int(sign) == 0:
                     result &= ~self.var_bdds_["s"+str(i)+"n"]
-                j=j+1
+                j = j+1
         return result
 
     def walk(self, a_bdd, out_format):
@@ -1190,12 +1336,12 @@ class Synthesizer(object):
         a_name = self.var_names_[a_lit]
 
         if out_format == NUSMV:
-            ite_lit = "((" + a_name + " & " + t_lit  + ") | (!" + a_name + " & " + e_lit +"))"
+            ite_lit = "((" + a_name + " & " + t_lit + ") | (!" + a_name + " & " + e_lit + "))"
             if a_bdd.IsComplement():
                 ite_lit = "!" + ite_lit
             self.output_model_ += "  " + node_name + " := " + ite_lit + ";\n"
         else:
-            ite_lit = a_name + " ? " + t_lit  + " : " + e_lit
+            ite_lit = a_name + " ? " + t_lit + " : " + e_lit
             if a_bdd.IsComplement():
                 ite_lit = "~(" + ite_lit + ")"
             self.output_model_ += "  assign " + node_name + " = " + ite_lit + ";\n"

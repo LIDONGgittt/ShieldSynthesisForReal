@@ -79,6 +79,15 @@ class Predicate(object):
         self.tokens = []
         self.tok = None
         self.nexttok = None
+        self.vars = dict()
+
+    def tokenizeAndParse(self, predStr):
+        self.tokens = []
+        self.tok = None
+        self.nexttok = None
+        self.tokenize(predStr)
+        return self.parse()
+
 
     def consume(self):
         self.tok = self.nexttok
@@ -195,10 +204,25 @@ class Predicate(object):
         if ast.getType()==3:
             left = self.generateConstrain(ast.getLeft())
             right = self.generateConstrain(ast.getRight())
-            constrain = eval('left' + 'ast.getValue()' + 'right')
+
+            op = ast.getValue()
+            override = ['+', '-', '*', '/', '==', '<=', '>=', '<', '>', '%']
+
+            if op in override:
+                constrain = eval('left' + ast.getValue() + 'right')
+            elif op == '&':
+                constrain = And(left, right)
+            elif op == '|':
+                constrain = Or(left, right)
+            else:
+                raise SyntaxError('Unknown operator in predicates!')
 
         elif ast.getType() == 0:# fix: mk_int_var
-            constrain = Real(ast.getValue())
+            if ast.getValue() in self.vars:
+                constrain = self.vars[ast.getValue()]
+            else:
+                constrain = Real(ast.getValue())
+                self.vars[ast.getValue()] = constrain
 
         elif ast.getType() == 1:
             constrain = int(ast.getValue())

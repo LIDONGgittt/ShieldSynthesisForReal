@@ -347,7 +347,7 @@ class KStabilizingAlgo(object):
     def buildFeasibilityAutomaton(self):
         #fesibility automaton only has output vars
         self.fsDFA_.setOutputVars(self.sdDFA_.getOutputVars())
-        self.fsDFA_.setVarName(self.sdDFA_.getVarNames())
+        self.fsDFA_.setVarNames(self.sdDFA_.getVarNames())
 
         # add first state (no conflicts)
         stateOne = DfaNode(1)
@@ -363,12 +363,19 @@ class KStabilizingAlgo(object):
         predicates = self.specDfa_.getPredicates()
         output_in_predicates = []
         for varN in self.fsDFA_.getOutputVars():
-            if self.fsDFA_.getVarName(varN) in predicates:
+            if self.fsDFA_.getVarName(varN)[:-3] in predicates:
                 output_in_predicates.append(varN)
 
         for pred in range(0, len(output_in_predicates)+1):
             for subset in combinations(output_in_predicates, pred):
-                label = self.createLabelFromSubset(subset)
+                literals = []
+                for varN in self.fsDFA_.getOutputVars():
+                    if varN in subset:
+                        literals.append(varN)
+                    else:
+                        literals.append(varN*-1)
+                label = DfaLabel(literals)
+
                 if self.isPredicatesFeasible(predicates, subset):
                     self.fsDFA_.addEdge(stateOne, stateOne, label)
                 else:
@@ -378,19 +385,17 @@ class KStabilizingAlgo(object):
 
         truePred = []
         for var in subset:
-            truePred.append(predicates[self.fsDFA_.getVarName(var)])
+            truePred.append(self.fsDFA_.getVarName(var)[:-3])
 
         s = Solver()
+        predicate_parser = Predicate()
 
         for varName in predicates:
-            predicate_parser = Predicate()
-            predicate_parser.tokenize(predicates[varName])
-            predicate_ast = predicate_parser.parse()
-
+            predicate_ast = predicate_parser.tokenizeAndParse(predicates[varName])
             sat = varName in truePred
             s.add(predicate_parser.generateConstrain(predicate_ast, sat))
 
-        if s.check() == sat:
+        if s.check() == CheckSatResult(Z3_L_TRUE):
             return True
         return False
 

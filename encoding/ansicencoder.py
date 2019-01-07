@@ -134,19 +134,21 @@ class AnsicEncoder(object):
         self.count = 0
         assertions = ''
         lits = set()
-        for var in self.specDFA.getOutputVars():
-            var_name = self.specDFA.getVarName(var)
-            predicates = self.specDFA.getPredicates()
-            if var_name in predicates:
-                predicate_parser = Predicate()
-                predicate_parser.tokenize(predicates[var_name])
-                predicate_ast = predicate_parser.parse()
-                lits = lits.union(predicate_ast.getLits())
-                assertion, count = self.solver_assert(predicate_ast)
-                assertions += assertion
+
+        predicates = self.specDFA.getPredicates()
+        for var_name in predicates:
+            predicate_parser = Predicate()
+            predicate_parser.tokenize(predicates[var_name])
+            predicate_ast = predicate_parser.parse()
+            lits = lits.union(predicate_ast.getLits())
+            assertion, ast = self.solver_assert(predicate_ast)
+            assertion += 'if(var->' + var_name+'__1) Z3_solver_assert(ctx, s,' + ast + ');\n'
+            assertion += 'else Z3_solver_assert(ctx, s, Z3_mk_not(ctx,' + ast + '));\n'
+            assertions += assertion
+
+
         pl += self.solver_init(lits)
         pl += assertions
-
         pl += self.solver_cc()
         return pl
 
@@ -157,7 +159,7 @@ class AnsicEncoder(object):
         init += '  Z3_model m = 0;\n'
         init += '  Z3_ast args[2];\n'
         for lit in lits:
-            init += '  Z3_ast' + lit + ' = mk_real_var(ctx, "' + lit + '");\n'
+            init += '  Z3_ast ' + lit + ' = mk_real_var(ctx, "' + lit + '");\n'
         init += '  ctx = mk_context();\n'
         init += '  s = mk_solver(ctx);\n'
         return init

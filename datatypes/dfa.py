@@ -265,12 +265,12 @@ class DFA(object):
         return list(set(a) & set(b))
     
     #returns all input literals from label
-    def getInputLiterals(self,label):      
+    def getInputLiterals(self, label):
         litLabel = label.getLiterals()   
         allInputLiterals = map(self.negate, self.inputVars_) + self.inputVars_        
         return self.intersect(allInputLiterals, litLabel)    
     
-    def getOutputLiterals(self,label):      
+    def getOutputLiterals(self, label):
         litLabel = label.getLiterals()   
         allOutputLiterals = map(self.negate, self.outputVars_) + self.outputVars_        
         return self.intersect(allOutputLiterals, litLabel)  
