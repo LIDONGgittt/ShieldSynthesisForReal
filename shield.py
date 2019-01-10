@@ -127,7 +127,8 @@ USAGE
                 print("Warning: right now fastSynthesis option is not supported in k-stabilizing algorithm!")
         elif args.algorithm == "realgo":
             shield_algorithm = REAL_ALGORITHM
-            if args.deviation >1:
+            allowed_dev = 1
+            if args.deviation > 1:
                 print("Warning: deviation option has no effect in real algorithm!")
             if args.fast:
                 print("Warning: fastSynthesis option is not supported in real algorithm!")
@@ -226,31 +227,11 @@ USAGE
 
         synthesis = Synthesizer(shield_algorithm, allowed_burst, fast_syn)
         synthesis.synthesize(algorithm.etDFA_, algorithm.sdDFA_, algorithm.scDFA_)
-#         print "spec:"
-#         print spec_dfa
-#         print "et:"
-#         print algorithm.etDFA_
-#         print "dev:"
-#         print algorithm.sdDFA_
-#         print "correct:"
-#         print algorithm.scDFA_
-#
-#         print "et and sd:"
-#         et_sd_DFA = algorithm.etDFA_.buildProductOfAutomata(algorithm.sdDFA_, True)
-#         et_sd_DFA = et_sd_DFA.combineUnsafeStates()
-#         et_sd_DFA = et_sd_DFA.standardization(True)
-#         print et_sd_DFA
-#         print "game:"
-#         game_DFA = et_sd_DFA.buildProductOfAutomata( algorithm.scDFA_, True)
-#        game_DFA = game_DFA.combineUnsafeStates()
-#        game_DFA = game_DFA.standardization(True)
-#         print game_DFA
-
         while not synthesis.existsWinningRegion():
             print 'ERROR: Winning Region cannot find in burst error algorithm!'
             sys.exit(404)
 
-    else:
+    elif shield_algorithm == K_STABILIZING_ALGORITHM:
         algorithm = KStabilizingAlgo(spec_dfa, allowed_dev)
 
         cur_time = time.time()
@@ -261,6 +242,7 @@ USAGE
 
 
         synthesis = Synthesizer_kstab(shield_algorithm, allowed_dev, algorithm.etDFA_, algorithm.sdDFA_, algorithm.scDFA_)
+        synthesis.synthesize()
 
         while not synthesis.existsWinningRegion():
             synthesis = None    #give GC time to destroy previous manager instance
@@ -274,11 +256,48 @@ USAGE
 
 
             cur_time = time.time()
-            automata_time = round(cur_time - pre_time,2)
+            automata_time = round(cur_time - pre_time, 2)
             pre_time = cur_time
             print("*** Automaton Construction time for k="+str(allowed_dev)+": "+ str(automata_time))
             print("*** ET Automaton Size: " + str(algorithm.etDFA_.getNodeNum())+'/'+str(len(algorithm.etDFA_.getEdges())))
             synthesis = Synthesizer_kstab(shield_algorithm, allowed_dev, algorithm.etDFA_, algorithm.sdDFA_, algorithm.scDFA_)
+            synthesis.synthesize()
+    else:  # shield_algorithm == REAL_ALGORITHM
+        algorithm = KStabilizingAlgo(spec_dfa, allowed_dev)
+
+        # cur_time = time.time()
+        # automata_time = round(cur_time - t_total, 2)
+        # pre_time = cur_time
+        # print("*** Automaton Construction time for k=" + str(allowed_dev) + ": " + str(automata_time))
+        # print("*** ET Automaton Size: " + str(algorithm.etDFA_.getNodeNum()) + '/' + str(
+        #     len(algorithm.etDFA_.getEdges())))
+
+        synthesis = Synthesizer_kstab(shield_algorithm, allowed_dev, algorithm.etDFA_, algorithm.sdDFA_,
+                                      algorithm.scDFA_, algorithm.fsDFA_, algorithm.drDFA_)
+
+
+        synthesis.synthesize_real()
+        while not synthesis.existsWinningRegion():
+            synthesis = None  # give GC time to destroy previous manager instance
+            allowed_dev = allowed_dev + 1
+            if allowed_dev == MAX_DEVIATIONS:
+                print "Killing because of deviation counter = " + str(MAX_DEVIATIONS)
+                sys.exit(99)
+
+            algorithm = KStabilizingAlgo(spec_dfa, allowed_dev)
+
+            cur_time = time.time()
+            automata_time = round(cur_time - pre_time, 2)
+            pre_time = cur_time
+            print("*** Automaton Construction time for k=" + str(allowed_dev) + ": " + str(automata_time))
+            print("*** ET Automaton Size: " + str(algorithm.etDFA_.getNodeNum()) + '/' + str(
+                len(algorithm.etDFA_.getEdges())))
+            synthesis = Synthesizer_kstab(shield_algorithm, allowed_dev, algorithm.etDFA_, algorithm.sdDFA_,
+                                      algorithm.scDFA_, algorithm.fsDFA_, algorithm.drDFA_)
+            synthesis.synthesize_real()
+
+
+
 
     #create output file and verify shield
 

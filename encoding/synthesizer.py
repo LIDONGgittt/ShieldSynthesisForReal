@@ -746,56 +746,6 @@ class Synthesizer(object):
         #print "Error_BDD:"
         #self.err_state_bdd_.PrintMinterm()
 
-    def create_error_states_real(self):
-        # Rules for error states:
-        # 1. Correctness: A state is unsafe, if shieldError_ is true
-        error_bdd_1 = self.mgr_.Zero()
-        non_error_bdd_1 = self.mgr_.Zero()
-
-        for state in self.correctness_dfa_.getNodes():
-
-            state_bdd = self.make_node_state_bdd(state.getNr() - 1, self.correctness_dfa_)
-            if state.getShieldError():
-                error_bdd_1 += state_bdd
-            else:
-                non_error_bdd_1 += state_bdd
-
-        # print "ERROR BDD 1. Correctness: A state is unsafe, if shieldError_ is true"
-        # error_bdd_1.PrintMinterm()
-        # print "=============="
-
-        # 2. No shield-deviation before system error:
-        error_bdd_2 = self.mgr_.Zero()
-        non_error_bdd_2 = self.mgr_.Zero()
-
-        for dev_state in self.deviation_dfa_.getNodes():
-            for et_state in self.error_tracking_dfa_.getNodes():
-
-                state_bdd_1 = self.make_node_state_bdd(dev_state.getNr() - 1, self.deviation_dfa_)
-                state_bdd_2 = self.make_node_state_bdd(et_state.getNr() - 1, self.error_tracking_dfa_)
-                state_bdd = state_bdd_1 & state_bdd_2
-
-                if dev_state.getShieldDeviation() > 0 and et_state.getDesignError() == 0:
-                    error_bdd_2 += state_bdd
-                else:
-                    non_error_bdd_2 += state_bdd
-
-        # print "ERROR BDD 2. No shield-deviation without system error:"
-        # error_bdd_2.PrintMinterm()
-        # print "=============="
-        # 3. Infeasible state in feasibility automata
-        error_bdd_3 = self.mgr_.Zero()
-        non_error_bdd_3 = self.mgr_.Zero()
-        for fs_state in self.feasibility_dfa_.getNodes():
-            state_bdd = self.make_node_state_bdd(fs_state.getNr() - 1, self.feasibility_dfa_)
-            if fs_state.isFinal():
-                error_bdd_3 += state_bdd
-            else:
-                non_error_bdd_3 += state_bdd
-
-        self.err_state_bdd_ = error_bdd_1 + error_bdd_2 + error_bdd_3
-        self.not_error_state_bdd = non_error_bdd_1 & non_error_bdd_2 & non_error_bdd_3
-
     def calc_winning_region(self):
 
         not_error_bdd = ~self.err_state_bdd_

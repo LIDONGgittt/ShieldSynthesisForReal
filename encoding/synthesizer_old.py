@@ -8,6 +8,7 @@ Created on Jun 10, 2014
 
 import pycudd
 import math
+import time
 from datatypes.dfa import DFA
 from datatypes.productnode import ProductNode
 from datatypes.dfalabel import DfaLabel
@@ -26,7 +27,8 @@ class Synthesizer_kstab(object):
     The final synthesis result can be given in Verilog or SMV.
     '''
 
-    def __init__(self, algorithm, num_shield_deviations, error_tracking_dfa, deviation_dfa, correctness_dfa):
+    def __init__(self, algorithm, num_shield_deviations, error_tracking_dfa, deviation_dfa, correctness_dfa,
+                 feasibility_dfa=None, relax_dfa=None):
         #print ("======================================\n synthesis  \n======================================\n")
         #init pycudd
         self.mgr_ = pycudd.DdManager()
@@ -37,10 +39,27 @@ class Synthesizer_kstab(object):
         self.num_shield_deviations_ = num_shield_deviations
         self.allowed_design_error_ = 1
 
-        self.error_tracking_dfa_ = error_tracking_dfa
-        self.deviation_dfa_ = deviation_dfa
-        self.correctness_dfa_ = correctness_dfa
+        self.error_tracking_dfa_ = error_tracking_dfa.unify()
+        self.deviation_dfa_ = deviation_dfa.unify()
+        self.correctness_dfa_ = correctness_dfa.unify()
+
+        self.error_tracking_dfa_.setName("error tracking dfa")
+        self.deviation_dfa_.setName("deviation dfa")
+        self.correctness_dfa_.setName("correctness dfa")
+
         self.dfa_list_ = [self.error_tracking_dfa_, self.deviation_dfa_, self.correctness_dfa_]
+
+        if feasibility_dfa:
+            self.feasibility_dfa_ = feasibility_dfa.unify()
+            self.feasibility_dfa_.setName("feasibility dfa")
+            self.dfa_list_ += [self.feasibility_dfa_]
+        else:
+            self.feasibility_dfa_ = None
+
+        if relax_dfa:
+            self.relax_dfa_ = relax_dfa.unify()
+            self.relax_dfa_.setName("design relax dfa")
+            self.dfa_list_ += [self.relax_dfa_]
 
         self.input_vars_ = []
         self.output_vars_ = []
@@ -60,7 +79,81 @@ class Synthesizer_kstab(object):
         self.max_tmp_count = 1
         self.result_model_ = ""
 
-        self.synthesize()
+    def synthesize_real(self):
+
+        synthe_0 = time.time()
+        for dfa in self.dfa_list_:
+            # add input vars
+            for input_var in dfa.getInputVars():
+                if input_var not in self.input_vars_:
+                    self.input_vars_.append(input_var)
+                    self.in_out_var_names_[input_var] = dfa.getVarName(input_var)
+            # add output vars
+            for output_var in dfa.getOutputVars():
+                if output_var not in self.output_vars_:
+                    self.output_vars_.append(output_var)
+                    self.in_out_var_names_[output_var] = dfa.getVarName(output_var)
+
+        # encode states and create init_state
+        # (create state bdds for all state bits of all automata)
+        state_order = self.encode_states()
+
+        self.create_init_states(self.dfa_list_)
+        # encode variables
+        var_order = self.encode_variables()
+
+        # build next state vars
+        self.next_state_vars_bdd_ = []
+        for state_pos in range(0, self.num_of_bits_):
+            self.next_state_vars_bdd_.append(self.var_bdds_['s' + str(self.num_of_bits_ - 1 - state_pos) + 'n'])
+
+        # build input variables bdds
+        self.in_var_bdds_ = []
+        for var in self.input_vars_:
+            self.in_var_bdds_.append(self.var_bdds_["v" + str(var - 1)])
+
+        # build output variables bdds
+        self.out_var_bdd_ = []
+        for var in self.output_vars_:
+            self.out_var_bdd_.append(self.var_bdds_["v" + str(var - 1)])
+
+        transition_bdds = []
+        for dfa in self.dfa_list_:
+            transition_bdd = self.encode_transitions(dfa)
+            # print dfa
+            # transition_bdd.PrintMinterm()
+            transition_bdds.append(transition_bdd)
+
+        # encode final transition relation
+        for transition_bdd in transition_bdds:
+            self.transition_bdd_ &= transition_bdd
+
+        self.create_error_states()
+
+        synthe_1 = time.time()
+        #         print("log: 1st stage time: " + str(round(synthe_1 - synthe_0,2)))
+
+        # calculate winning region
+        self.win_region_ = self.calc_winning_region()
+        # print "win_region"
+        # self.win_region_.PrintMinterm()
+
+        if self.win_region_ != self.mgr_.Zero():
+            # print("winning region:")
+            # self.win_region_.PrintMinterm()
+            non_det_strategy = self.get_nondet_strategy(self.win_region_)
+            det_strategy = self.get_det_strategy(non_det_strategy)
+
+            self.func_by_var_ = self.extract_output_funcs(det_strategy)
+
+        else:
+            print 'cannot find wining region for real algorithm!'
+            return
+
+        synthe_2 = time.time()
+
+    #         print("log: 2nd stage time: " + str(round(synthe_2 - synthe_1,2)))
+
 
     def synthesize(self):
 
@@ -107,7 +200,10 @@ class Synthesizer_kstab(object):
         #encode transition relation for each dfa
         transition_bdds = []
         for dfa in self.dfa_list_:
-            transition_bdds.append(self.encode_transitions(dfa))
+            transition_bdd = self.encode_transitions(dfa)
+            # print dfa
+            # transition_bdd.PrintMinterm()
+            transition_bdds.append(transition_bdd)
 
         #encode final transition relation
         for transition_bdd in transition_bdds:
@@ -166,6 +262,51 @@ class Synthesizer_kstab(object):
         else:
             return False
 
+
+    def create_init_states(self, dfa_list):
+
+        for dfa in dfa_list:
+            init_state = dfa.getInitialNodes()[0]
+            self.init_state_bdd_ &= self.make_node_state_bdd(init_state.getNr() - 1, dfa)
+
+    def encode_states(self):
+        num_of_bits_dict = dict()
+
+        for dfa in self.dfa_list_:
+            num_bits = int(math.ceil(math.log(len(dfa.getNodes()), 2)))
+            self.num_of_bits_ = self.num_of_bits_ + num_bits
+            num_of_bits_dict[dfa] = num_bits
+
+        self.state_offsets_[self.dfa_list_[0]] = 0
+        offset = 0
+        for i in range(1, len(self.dfa_list_)):
+            offset = offset + num_of_bits_dict[self.dfa_list_[i - 1]]
+            self.state_offsets_[self.dfa_list_[i]] = offset
+
+        state_order = ""
+
+        self.state_index = len(self.var_bdds_)
+        # create var bdds
+        for state_pos in range(0, self.num_of_bits_):
+            node_bdd = self.mgr_.IthVar(len(self.var_bdds_))
+            state_name = 's' + str(self.num_of_bits_ - 1 - state_pos)
+            self.var_names_.append(state_name)
+            self.var_bdds_[state_name] = node_bdd
+            state_order += state_name + " "
+
+        for state_pos in range(0, self.num_of_bits_):
+            node_bdd = self.mgr_.IthVar(len(self.var_bdds_))
+            state_name = 's' + str(self.num_of_bits_ - 1 - state_pos) + 'n'
+            self.var_names_.append(state_name)
+            self.var_bdds_[state_name] = node_bdd
+            state_order += state_name + " "
+
+        # print "Init_state_BDD"
+        # self.init_state_bdd_.PrintMinterm()
+        return state_order
+
+
+
     def encode_states_and_create_init_state(self):
 
         num_of_bits_dict = dict()
@@ -175,38 +316,43 @@ class Synthesizer_kstab(object):
             self.num_of_bits_ = self.num_of_bits_ + num_bits
             num_of_bits_dict[dfa] = num_bits
 
-        self.state_offsets_[self.dfa_list_[0]]=0
+        self.state_offsets_[self.dfa_list_[0]] = 0
         offset = 0
         for i in range(1, len(self.dfa_list_)):
             offset = offset + num_of_bits_dict[self.dfa_list_[i-1]]
-            self.state_offsets_[self.dfa_list_[i]]=offset
+            self.state_offsets_[self.dfa_list_[i]] = offset
 
-        state_order=""
+        state_order = ""
 
         #create var bdds
         for state_pos in range(0, self.num_of_bits_):
             node_bdd = self.mgr_.IthVar(len(self.var_bdds_))
             state_name = 's'+str(self.num_of_bits_-1-state_pos)
             self.var_names_.append(state_name)
-            self.var_bdds_[state_name]=node_bdd
+            self.var_bdds_[state_name] = node_bdd
             state_order += state_name + " "
 
         for state_pos in range(0, self.num_of_bits_):
             node_bdd = self.mgr_.IthVar(len(self.var_bdds_))
             state_name = 's'+str(self.num_of_bits_-1-state_pos)+'n'
             self.var_names_.append(state_name)
-            self.var_bdds_[state_name]=node_bdd
+            self.var_bdds_[state_name] = node_bdd
             state_order += state_name + " "
 
-        #create initial state bdd
-        init_state_et = self.error_tracking_dfa_.getInitialNodes()[0]
-        self.init_state_bdd_ &= self.make_node_state_bdd(init_state_et.getNr()-1, self.error_tracking_dfa_)
 
-        init_state_dev = self.deviation_dfa_.getInitialNodes()[0]
-        self.init_state_bdd_ &= self.make_node_state_bdd(init_state_dev.getNr()-1, self.deviation_dfa_)
+        for dfa in self.dfa_list_:
+            init_state = dfa.getInitialNodes()[0]
+            self.init_state_bdd_ &= self.make_node_state_bdd(init_state.getNr() - 1, dfa)
 
-        init_state_cor = self.correctness_dfa_.getInitialNodes()[0]
-        self.init_state_bdd_ &= self.make_node_state_bdd(init_state_cor.getNr()-1, self.correctness_dfa_)
+        # #create initial state bdd
+        # init_state_et = self.error_tracking_dfa_.getInitialNodes()[0]
+        # self.init_state_bdd_ &= self.make_node_state_bdd(init_state_et.getNr()-1, self.error_tracking_dfa_)
+        #
+        # init_state_dev = self.deviation_dfa_.getInitialNodes()[0]
+        # self.init_state_bdd_ &= self.make_node_state_bdd(init_state_dev.getNr()-1, self.deviation_dfa_)
+        #
+        # init_state_cor = self.correctness_dfa_.getInitialNodes()[0]
+        # self.init_state_bdd_ &= self.make_node_state_bdd(init_state_cor.getNr()-1, self.correctness_dfa_)
 
         #print "Init_state_BDD"
         #self.init_state_bdd_.PrintMinterm()
@@ -255,12 +401,21 @@ class Synthesizer_kstab(object):
         #transition_bdd.PrintMinterm()
         return transition_bdd
 
-
     def create_error_states(self):
 
         # find final states according to given algorithm (K_STABILIZING_ALGORITHM or FINITE_ERROR_ALGORITHM)
 
         self.err_state_bdd_ = self.mgr_.Zero()
+
+        relax_state_bdds = None
+        if self.relax_dfa_:
+            relax_state_bdds = self.mgr_.Zero()
+            for state in self.relax_dfa_.getNodes():
+                if not state.isFinal():
+                    relax_state_bdd = self.make_node_state_bdd(state.getNr() - 1, self.relax_dfa_)
+                    relax_state_bdds += relax_state_bdd
+        else:
+            relax_state_bdds = self.mgr_.One()
 
         #Rules for error states:
         #1. Correctness: A state is unsafe, if shieldError_ is true
@@ -268,6 +423,7 @@ class Synthesizer_kstab(object):
         for state in self.correctness_dfa_.getNodes():
             if state.getShieldError():
                 error_state_bdd = self.make_node_state_bdd(state.getNr()-1, self.correctness_dfa_)
+                error_state_bdd &= relax_state_bdds
                 error_bdd_1 += error_state_bdd
 
         #print "ERROR BDD 1. Correctness: A state is unsafe, if shieldError_ is true"
@@ -282,8 +438,8 @@ class Synthesizer_kstab(object):
                     if et_state.getDesignError()==0:
                         err_state_bdd_1 = self.make_node_state_bdd(dev_state.getNr()-1, self.deviation_dfa_)
                         err_state_bdd_2 = self.make_node_state_bdd(et_state.getNr()-1, self.error_tracking_dfa_)
-                        err_state_bdd = err_state_bdd_1
-                        err_state_bdd &= err_state_bdd_2
+                        err_state_bdd = err_state_bdd_1 & err_state_bdd_2
+                        err_state_bdd &= relax_state_bdds
                         error_bdd_2 += err_state_bdd
 
         #print "ERROR BDD 2. No shield-deviation without system error:"
@@ -311,11 +467,18 @@ class Synthesizer_kstab(object):
             #print "=============="
             self.err_state_bdd_ += error_bdd_3
 
+        if self.feasibility_dfa_:
+            error_bdd_4 = self.mgr_.Zero()
+            for fs_state in self.feasibility_dfa_.getNodes():
+                if fs_state.isFinal():
+                    state_bdd = self.make_node_state_bdd(fs_state.getNr() - 1, self.feasibility_dfa_)
+                    state_bdd &= relax_state_bdds
+                    error_bdd_4 += state_bdd
+            self.err_state_bdd_ += error_bdd_4
         #print "Error_BDD:"
         #self.err_state_bdd_.PrintMinterm()
 
     def calc_winning_region(self):
-
         not_error_bdd = ~self.err_state_bdd_
         new_set_bdd = self.mgr_.One()
         while True:
@@ -698,7 +861,7 @@ class Synthesizer_kstab(object):
 
 
 
-    def make_node_state_bdd(self,nodeNr, dfa):
+    def make_node_state_bdd(self, nodeNr, dfa):
 
         num_bits = int(math.ceil(math.log(len(dfa.getNodes()), 2)))
         offset = self.state_offsets_[dfa]

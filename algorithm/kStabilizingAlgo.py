@@ -37,6 +37,8 @@ class KStabilizingAlgo(object):
         #Feasibility Automaton
         self.fsDFA_ = DFA()
 
+        self.drDFA_ = DFA()
+
         #Final Product DFA
         self.finalDFA_ = DFA()
 
@@ -59,7 +61,8 @@ class KStabilizingAlgo(object):
         self.buildFeasibilityAutomaton()
         if DEBUG:
             print("  ...done")
-
+            print("  start building RelaxAutomaton...")
+        self.buildRelaxAutomaton()
         #print("1) Final Error Tracking DFA after Standardization")
         #self.etDFA_.debugPrintDfa(True)
         #print("2) Final Shield Deviation DFA")
@@ -380,6 +383,44 @@ class KStabilizingAlgo(object):
                     self.fsDFA_.addEdge(stateOne, stateOne, label)
                 else:
                     self.fsDFA_.addEdge(stateOne, stateTwo, label)
+
+    def buildRelaxAutomaton(self):
+        # fesibility automaton only has output vars
+        self.drDFA_.setInputVars(self.sdDFA_.getInputVars())
+        self.drDFA_.setVarNames(self.sdDFA_.getVarNames())
+
+        for sState in self.fsDFA_.getNodes():
+            state = DfaNode(sState)
+            self.drDFA_.addNode(state, True)
+
+        # copy edges from design automata
+        for sState in self.fsDFA_.getNodes():
+            for designEdge in sState.getOutgoingEdges():
+                sLabel = designEdge.getLabel()
+                literals = sLabel.getLiterals()
+
+                if sLabel.isValidLabel():
+                    c_literals = []
+                    for literal in literals:
+                        var_name = self.fsDFA_.getVarName(abs(literal))[:-3]
+                        for var, name in self.drDFA_.getVarNames().items():
+                            if name == var_name:
+                                c_literal = var
+                        if literal < 0:
+                            c_literal = c_literal * -1
+                        c_literals.append(c_literal)
+                    c_label = DfaLabel(c_literals)
+                else:
+                    c_label = DfaLabel(literals)
+
+                sTarget = self.drDFA_.getNode(designEdge.getTargetNode().getNr())
+                sSource = self.drDFA_.getNode(designEdge.getSourceNode().getNr())
+                self.drDFA_.addEdge(sSource, sTarget, c_label)
+
+
+
+
+
 
     def isPredicatesFeasible(self, predicates, subset):
 

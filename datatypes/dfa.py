@@ -85,6 +85,7 @@ class DFA(object):
         '''
         Constructor
         '''
+        self.name_ = ''
         self.numStates_ = numStates       #number of states
         self.numVI_= numVI     #number of input variables
         self.numVO_ = numVO     #number of output variables
@@ -102,6 +103,9 @@ class DFA(object):
 
     def getPredicates(self):
         return self.predicates_
+
+    def setName(self, str):
+        self.name_ = str
 
     def __repr__(self):        
         retVal = self.getPrettyMe()
@@ -339,7 +343,7 @@ class DFA(object):
     and creates an equivalent automaton with DfaNodes or ProductNodes.
     Closes gaps in node numbers.
     '''
-    def standardization(self, use_dfa_nodes = False):
+    def standardization(self, use_dfa_nodes=False):
 
         nodes = self.getNodes()
 
@@ -468,25 +472,25 @@ class DFA(object):
     
     
     def getPrettyMe(self, nodeDetails=False):
-        outputStr="\n=================================="
+        outputStr = "\n===========" + self.name_ + "======================="
 
-        outputStr+= "\n input vars: "
+        outputStr += "\n input vars: "
         for var in self.inputVars_:
-            outputStr+= self.VarNames_[var] + " "
+            outputStr += self.VarNames_[var] + " "
 
-        outputStr+= "\n output vars: "
+        outputStr += "\n output vars: "
         for var in self.outputVars_:
-            outputStr+= self.VarNames_[var] + " "
+            outputStr += self.VarNames_[var] + " "
 
-        outputStr+="\n states:\n"
+        outputStr += "\n states:\n"
         for node in self.Nodes_:
-            outputStr+="    "+self.getPrettyNode(node, nodeDetails)+"\n"
+            outputStr += "    " + self.getPrettyNode(node, nodeDetails)+"\n"
         
-        outputStr+="\n"
+        outputStr += "\n"
         
-        outputStr+=" transitions:\n"
+        outputStr += " transitions:\n"
         for edge in self.Edges_:
-            outputStr+="    "+self.getPrettyEdge(edge,nodeDetails)+"\n"
+            outputStr += "    " + self.getPrettyEdge(edge,nodeDetails)+"\n"
         
         
            
