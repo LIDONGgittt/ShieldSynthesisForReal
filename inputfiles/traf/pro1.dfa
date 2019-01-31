@@ -21,8 +21,8 @@ dfa 2 0 2 1 1 5
 1 1 -1 2            #rg is fine
 1 2 1 2             #gg is error
 2 2
-1 farm_light
-2 hwy_light
+1 farm_light (u < 0.05 & u > -0.05)
+2 hwy_light  (u < 0.02 & u > -0.02)
 
 
 

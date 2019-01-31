@@ -317,6 +317,8 @@ USAGE
         with open(output_file_name+".v", "w+") as text_file:
             text_file.write(verilog_str)
     else: #encoding = ANSIC
+
+
         ansic_encoder = AnsicEncoder(spec_dfa)
         ansic_encoder.addShieldModel(synthesis.getResultModel(encoding), synthesis.getNumOfBits(), synthesis.getMaxTmpCount())
         ansic_str = ansic_encoder.getEncodedData()

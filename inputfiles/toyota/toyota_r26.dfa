@@ -32,11 +32,11 @@ dfa 5 4 1 1 1 20
 5 5 1 -2 3
 5 3 -1 -2
 5 3 2
-1 ts      #input
-2 T       #input
+1 ts     (t>1) #input ts =1
+2 T      (t>100) #input T=100
 3 l1      #input
 4 l2      #input
-5 u005  ((u < 0.05) & (u > -0.05)) #output
+5 u005  (u < 0.05 & u > -0.05) #output
 
 
 
