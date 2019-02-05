@@ -1293,7 +1293,7 @@ class Synthesizer(object):
         else:
             ite_lit = a_name + " ? " + t_lit + " : " + e_lit
             if a_bdd.IsComplement():
-                ite_lit = "~(" + ite_lit + ")"
+                ite_lit = "!(" + ite_lit + ")"
             self.output_model_ += "  assign " + node_name + " = " + ite_lit + ";\n"
 
         return node_name

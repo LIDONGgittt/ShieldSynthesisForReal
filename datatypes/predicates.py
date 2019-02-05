@@ -15,9 +15,10 @@ class AstNode(object):
         self.left_ = self.right_ = self.parent_ = None
 
     def __repr__(self):
-        if self.type_ < 3:
+        if self.type_ < 3 or self.type_ ==4:
             return self.value_
-        xstr = lambda s: s.__repr__() or ' '
+
+        xstr = lambda s: '' if s is None else s.__repr__()
 
         return xstr(self.left_) + ' ' + self.value_ + ' ' + xstr(self.right_)
 
@@ -139,7 +140,6 @@ class Predicate(object):
             exprval = self.tok
             right = self.term()
             exprval.setRight(right)
-            exprval = self.tok
         return exprval
 
     def pred1(self):
@@ -155,7 +155,7 @@ class Predicate(object):
 
     def pred2(self):
         # pred2 := pred1 { ('&'|'|') pred }*"
-        predSymbol = ['&', '|', '!', 'xor']
+        predSymbol = ['&', '|', '!', 'xor', '&&', '||']
 
         predval = self.pred1()
         while self.accept(predSymbol):
@@ -190,7 +190,7 @@ class Predicate(object):
             (r"[a-zA-Z_]\w*", self.s_ident),
             (r"-?\d+\.\d*", self.s_float),
             (r"-?\d+", self.s_int),
-            (r"==|\+|-|\*|/|>=|<=|>|<|&", self.s_operator),
+            (r"==|\+|-|\*|/|>=|<=|>|<|&|\|\||\|", self.s_operator),
             (r"\(|\)", self.s_paren),
             (r"\s+", None),
         ])
@@ -210,9 +210,9 @@ class Predicate(object):
 
             if op in override:
                 constrain = eval('left' + ast.getValue() + 'right')
-            elif op == '&':
+            elif op == '&' or op == '&&':
                 constrain = And(left, right)
-            elif op == '|':
+            elif op == '|' or op == '||':
                 constrain = Or(left, right)
             else:
                 raise SyntaxError('Unknown operator in predicates!')

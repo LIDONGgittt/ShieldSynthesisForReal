@@ -48,6 +48,8 @@ class Synthesizer_kstab(object):
         self.correctness_dfa_.setName("correctness dfa")
 
         self.dfa_list_ = [self.error_tracking_dfa_, self.deviation_dfa_, self.correctness_dfa_]
+        self.feasibility_dfa_ = None
+        self.relax_dfa_ = None
 
         if feasibility_dfa:
             self.feasibility_dfa_ = feasibility_dfa.unify()
@@ -480,16 +482,39 @@ class Synthesizer_kstab(object):
 
     def calc_winning_region(self):
         not_error_bdd = ~self.err_state_bdd_
-        new_set_bdd = self.mgr_.One()
+        new_set_bdd = not_error_bdd
         while True:
             curr_set_bdd = new_set_bdd
             new_set_bdd = not_error_bdd & self.pre_sys_bdd(curr_set_bdd, self.transition_bdd_)
+
+            print "current state in region:"
+            self.printStatesInBdd((~new_set_bdd) & curr_set_bdd)
+            print "========================"
+
 
             if (new_set_bdd & self.init_state_bdd_) == self.mgr_.Zero():
                 return self.mgr_.Zero()
 
             if new_set_bdd == curr_set_bdd:
                 return new_set_bdd
+
+    def printStatesInBdd(self, bdd):
+
+        for node1 in self.error_tracking_dfa_.getNodes():
+            nodebdd1 = self.make_node_state_bdd(node1.getNr() - 1, self.error_tracking_dfa_)
+            for node2 in self.correctness_dfa_.getNodes():
+                nodebdd2 = nodebdd1 & self.make_node_state_bdd(node2.getNr() - 1, self.correctness_dfa_)
+                for node3 in self.deviation_dfa_.getNodes():
+                    nodebdd3 = nodebdd2 & self.make_node_state_bdd(node3.getNr() - 1, self.deviation_dfa_)
+                    for node4 in self.feasibility_dfa_.getNodes():
+                        nodebdd4 = nodebdd3 & self.make_node_state_bdd(node4.getNr() - 1, self.feasibility_dfa_)
+                        for node5 in self.relax_dfa_.getNodes():
+                            nodebdd5 = nodebdd4 & self.make_node_state_bdd(node5.getNr() - 1, self.relax_dfa_)
+                            if (nodebdd5 & bdd) != self.mgr_.Zero():
+                                print node1.toString(False,False) + ' ' + node2.toString(False,False) + ' '\
+                                      + node3.toString(False,False) + ' ' + node4.toString(False,False) + ' ' + node5.toString(False,False)
+
+
 
 
     def getWinStateNum(self, strategy):
@@ -964,7 +989,7 @@ class Synthesizer_kstab(object):
         else: #out_format == ANSIC:
             ite_lit = a_name + " ? " + t_lit + " : " + e_lit
             if a_bdd.IsComplement():
-                ite_lit = "~(" + ite_lit + ")"
+                ite_lit = "!(" + ite_lit + ")"
             self.output_model_ += "  " + node_name + " = " + ite_lit + ";\n"
         return node_name
 

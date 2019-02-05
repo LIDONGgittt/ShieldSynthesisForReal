@@ -87,17 +87,38 @@ USAGE
     try:
         # Setup argument parser
         parser = ArgumentParser(description=program_license, formatter_class=RawDescriptionHelpFormatter)
-        parser.add_argument("-a", "--algorithm", dest="algorithm", help="Used algorithm to synthesize shield. Support ksalgo (k-stabilizing algorithm), bealgo (burst error algorithm or realgo (real domain algorithm). [default: realgo]", default="realgo")
-#         parser.add_argument("-d", "--design", dest="design", help="concrete design to be load (written as automaton or in verilog)")
-        parser.add_argument("-e", "--encoding", dest="encoding", help="encoding format of the output file. Support verilog or ansic. [default: ansic]", default="ansic")
+        parser.add_argument("-a", "--algorithm", dest="algorithm",
+                            help="Used algorithm to synthesize shield. Support ksalgo (k-stabilizing algorithm), bealgo (burst error algorithm or realgo (real domain algorithm). [default: realgo]",
+                            default="realgo")
+#         parser.add_argument("-d", "--design", dest="design",
+        #         help="concrete design to be load (written as automaton or in verilog)")
+        parser.add_argument("-e", "--encoding", dest="encoding",
+                            help="encoding format of the output file. Support verilog or ansic. [default: ansic]",
+                            default="ansic")
 #         parser.add_argument("-v", "--visspec", dest="visspec", help="specification input file for VIS model checker")
         parser.add_argument('-V', '--version', action='version', version=program_version_message)
-        parser.add_argument('-f', '--fastSynthesis', dest='fast', action='store_true', help='compute winning region using implication. Only valid when algorithm is set to bealgo.', default=False)
-        parser.add_argument("-dev", "--deviation", dest="deviation", help="override the allowed deviation(assigned to 1 means must be greater than 1). Only valid when algorithm is set to ksalgo.[default: 1]", type=int, default=1)
+        parser.add_argument('-f', '--fastSynthesis', dest='fast', action='store_true',
+                            help='compute winning region using implication. Only valid when algorithm is set to bealgo.', default=False)
+        parser.add_argument("-dev", "--deviation", dest="deviation",
+                            help="override the allowed deviation(assigned to 1 means must be greater than 1). Only valid when algorithm is set to ksalgo.[default: 1]",
+                            type=int, default=1)
+        parser.add_argument("-p", "--prediction", dest="prediction",
+                            help="which algorithm should be used for prediction. Support none (use lp solver directly), linear(linear line regression) or poly (polynomial curve fitting)[default: poly]",
+                            default="poly")
         parser.add_argument('spec_file', nargs='+')
 
         # Process arguments
         args = parser.parse_args()
+
+        if args.prediction == "none":
+            predict = 0
+        elif args.prediction == "linear":
+            predict = 1
+        elif args.prediction == "poly":
+            predict = 2
+        else:
+            print("ERROR: Unknown prediction algorithm!")
+            sys.exit(-1)
 
         if args.encoding=="verilog":
             encoding = VERILOG
@@ -110,10 +131,14 @@ USAGE
         fast_syn = False
 
         if args.algorithm == "bealgo":
+            shield_algorithm = BURST_ERROR_ALGORITHM
             if args.deviation >1:
                 print("Warning: deviation option has no effect in burst error algorithm!")
             if args.fast:
                 fast_syn = True
+
+            if predict > 0:
+                print("Warning: prediction option has no effect in burst error algorithm!")
 
         elif args.algorithm == "ksalgo":
             shield_algorithm = K_STABILIZING_ALGORITHM
@@ -125,6 +150,10 @@ USAGE
                 sys.exit(-1)
             if args.fast:
                 print("Warning: right now fastSynthesis option is not supported in k-stabilizing algorithm!")
+
+            if predict > 0:
+                print("Warning: prediction option has no effect in k-stabilizing algorithm!")
+
         elif args.algorithm == "realgo":
             shield_algorithm = REAL_ALGORITHM
             allowed_dev = 1
@@ -182,6 +211,7 @@ USAGE
         print("** Used Synthesis Algorithm: Burst Error Algorithm")
     else:
         print("** Used Synthesis Algorithm: Real Algorithm")
+        print("** Used Prediction Algorithm:" + args.prediction)
 
     if fast_syn:
         print("** Use implication to compute winning region")
@@ -265,20 +295,24 @@ USAGE
     else:  # shield_algorithm == REAL_ALGORITHM
         algorithm = KStabilizingAlgo(spec_dfa, allowed_dev)
 
-        # cur_time = time.time()
-        # automata_time = round(cur_time - t_total, 2)
-        # pre_time = cur_time
-        # print("*** Automaton Construction time for k=" + str(allowed_dev) + ": " + str(automata_time))
-        # print("*** ET Automaton Size: " + str(algorithm.etDFA_.getNodeNum()) + '/' + str(
-        #     len(algorithm.etDFA_.getEdges())))
+        cur_time = time.time()
+        automata_time = round(cur_time - t_total, 2)
+        pre_time = cur_time
+        print("*** Automaton Construction time for k=" + str(allowed_dev) + ": " + str(automata_time))
+        print("*** ET Automaton Size: " + str(algorithm.etDFA_.getNodeNum()) + '/' + str(
+            len(algorithm.etDFA_.getEdges())))
 
         synthesis = Synthesizer_kstab(shield_algorithm, allowed_dev, algorithm.etDFA_, algorithm.sdDFA_,
                                       algorithm.scDFA_, algorithm.fsDFA_, algorithm.drDFA_)
 
+        # synthesis = Synthesizer_kstab(shield_algorithm, allowed_dev, algorithm.etDFA_, algorithm.sdDFA_,
+        #                               algorithm.scDFA_, None, algorithm.drDFA_)
 
         synthesis.synthesize_real()
         while not synthesis.existsWinningRegion():
             synthesis = None  # give GC time to destroy previous manager instance
+            print "didn't find winning strategy for the first time!!"
+
             allowed_dev = allowed_dev + 1
             if allowed_dev == MAX_DEVIATIONS:
                 print "Killing because of deviation counter = " + str(MAX_DEVIATIONS)
@@ -317,9 +351,7 @@ USAGE
         with open(output_file_name+".v", "w+") as text_file:
             text_file.write(verilog_str)
     else: #encoding = ANSIC
-
-
-        ansic_encoder = AnsicEncoder(spec_dfa)
+        ansic_encoder = AnsicEncoder(spec_dfa, predict)
         ansic_encoder.addShieldModel(synthesis.getResultModel(encoding), synthesis.getNumOfBits(), synthesis.getMaxTmpCount())
         ansic_str = ansic_encoder.getEncodedData()
 

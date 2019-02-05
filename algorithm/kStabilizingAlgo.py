@@ -63,12 +63,8 @@ class KStabilizingAlgo(object):
             print("  ...done")
             print("  start building RelaxAutomaton...")
         self.buildRelaxAutomaton()
-        #print("1) Final Error Tracking DFA after Standardization")
-        #self.etDFA_.debugPrintDfa(True)
-        #print("2) Final Shield Deviation DFA")
-        #self.sdDFA_.debugPrintDfa(True)
-        #print("3) Final Shield Correctness DFA")
-        #self.scDFA_.debugPrintDfa(True)
+        print self.drDFA_
+        print self.fsDFA_
 
     '''
     Creates automata to track the behavior of the design.
@@ -348,9 +344,11 @@ class KStabilizingAlgo(object):
                 self.scDFA_.addEdge(sourceTarget, shieldTarget, shieldLabel)
 
     def buildFeasibilityAutomaton(self):
+        #TODO: should only pick predicates with common vars
+
         #fesibility automaton only has output vars
-        self.fsDFA_.setOutputVars(self.sdDFA_.getOutputVars())
-        self.fsDFA_.setVarNames(self.sdDFA_.getVarNames())
+        # self.fsDFA_.setOutputVars(self.sdDFA_.getOutputVars())
+        # self.fsDFA_.setVarNames(self.sdDFA_.getVarNames())
 
         # add first state (no conflicts)
         stateOne = DfaNode(1)
@@ -364,36 +362,80 @@ class KStabilizingAlgo(object):
         self.fsDFA_.addEdge(stateTwo, stateTwo, DfaLabel())
 
         predicates = self.specDfa_.getPredicates()
+
+        s = Solver()
+        predicate_parser = Predicate()
+        constrain_dict = dict()
         output_in_predicates = []
-        for varN in self.fsDFA_.getOutputVars():
-            if self.fsDFA_.getVarName(varN)[:-3] in predicates:
+
+        for varN in self.sdDFA_.getOutputVars():
+            varName = self.sdDFA_.getVarName(varN)[:-3]
+            if varName in predicates:
+                self.fsDFA_.addOutputVar(varN)
+                self.fsDFA_.setVarName(varN, self.sdDFA_.getVarName(varN))
+
                 output_in_predicates.append(varN)
+                predicate_ast = predicate_parser.tokenizeAndParse(predicates[varName])
+                constrain_dict[varName] = predicate_parser.generateConstrain(predicate_ast)
 
         for pred in range(0, len(output_in_predicates)+1):
             for subset in combinations(output_in_predicates, pred):
                 literals = []
-                for varN in self.fsDFA_.getOutputVars():
+                truePred = []
+
+                for varN in output_in_predicates:
                     if varN in subset:
                         literals.append(varN)
+                        truePred.append(self.fsDFA_.getVarName(varN)[:-3])
                     else:
                         literals.append(varN*-1)
                 label = DfaLabel(literals)
-
-                if self.isPredicatesFeasible(predicates, subset):
+                s.push()
+                if self.isPredicatesFeasible(s, constrain_dict, truePred):
                     self.fsDFA_.addEdge(stateOne, stateOne, label)
                 else:
                     self.fsDFA_.addEdge(stateOne, stateTwo, label)
+                s.pop()
 
     def buildRelaxAutomaton(self):
-        # fesibility automaton only has output vars
-        self.drDFA_.setInputVars(self.sdDFA_.getInputVars())
-        self.drDFA_.setVarNames(self.sdDFA_.getVarNames())
 
-        for sState in self.fsDFA_.getNodes():
-            state = DfaNode(sState)
-            self.drDFA_.addNode(state, True)
+        predicates = self.specDfa_.getPredicates()
 
-        # copy edges from design automata
+        s = Solver()
+        predicate_parser = Predicate()
+        constrain_dict = dict()
+        input_in_predicates = []
+
+        for varN in self.specDfa_.getInputVars():
+            varName = self.specDfa_.getVarName(varN)
+            if varName in predicates:
+                self.drDFA_.addInputVar(varN)
+                self.drDFA_.setVarName(varN, varName)
+                input_in_predicates.append(varN)
+                predicate_ast = predicate_parser.tokenizeAndParse(predicates[varName])
+                constrain_dict[varName] = predicate_parser.generateConstrain(predicate_ast)
+
+        for varN in self.specDfa_.getOutputVars():
+            varName = self.specDfa_.getVarName(varN)
+            if varName in predicates:
+                self.drDFA_.addInputVar(varN)
+                self.drDFA_.setVarName(varN, varName)
+
+        # add first state (similar to feasibility automaton)
+        stateOne = DfaNode(1)
+        stateOne.setInitial(True)
+        self.drDFA_.addNode(stateOne, True)
+
+        # add second state
+        stateTwo = DfaNode(2)
+        stateTwo.setFinal(True)
+        self.drDFA_.addNode(stateTwo, True)
+        self.drDFA_.addEdge(stateTwo, stateTwo, DfaLabel())
+
+        label1 = []
+        label2 = []
+
+        # copy edges from fs automata
         for sState in self.fsDFA_.getNodes():
             for designEdge in sState.getOutgoingEdges():
                 sLabel = designEdge.getLabel()
@@ -413,30 +455,40 @@ class KStabilizingAlgo(object):
                 else:
                     c_label = DfaLabel(literals)
 
-                sTarget = self.drDFA_.getNode(designEdge.getTargetNode().getNr())
-                sSource = self.drDFA_.getNode(designEdge.getSourceNode().getNr())
-                self.drDFA_.addEdge(sSource, sTarget, c_label)
+                if designEdge.getTargetNode().getNr()==1:
+                    label1.append(c_label)
+                elif designEdge.getSourceNode().getNr()==1:
+                    self.drDFA_.addEdge(stateOne, stateTwo, c_label)
 
+        for pred in range(0, len(input_in_predicates) + 1):
+            for subset in combinations(input_in_predicates, pred):
+                literals = []
+                truePred = []
 
+                for varN in input_in_predicates:
+                    if varN in subset:
+                        literals.append(varN)
+                        truePred.append(self.specDfa_.getVarName(varN))
+                    else:
+                        literals.append(varN * -1)
+                label = DfaLabel(literals)
 
+                s.push()
+                if self.isPredicatesFeasible(s, constrain_dict, truePred):
+                    for out_label in label1:
+                        self.drDFA_.addEdge(stateOne, stateOne, label.merge(out_label))
+                else:
+                    self.drDFA_.addEdge(stateOne, stateTwo, label)
+                s.pop()
 
+    def isPredicatesFeasible(self, solver, constrains, truePred):
+        for varName in constrains:
+            if varName in truePred:
+                solver.add(constrains[varName])
+            else:
+                solver.add(Not(constrains[varName]))
 
-
-    def isPredicatesFeasible(self, predicates, subset):
-
-        truePred = []
-        for var in subset:
-            truePred.append(self.fsDFA_.getVarName(var)[:-3])
-
-        s = Solver()
-        predicate_parser = Predicate()
-
-        for varName in predicates:
-            predicate_ast = predicate_parser.tokenizeAndParse(predicates[varName])
-            sat = varName in truePred
-            s.add(predicate_parser.generateConstrain(predicate_ast, sat))
-
-        if s.check() == CheckSatResult(Z3_L_TRUE):
+        if solver.check() == CheckSatResult(Z3_L_TRUE):
             return True
         return False
 

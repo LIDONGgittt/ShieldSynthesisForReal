@@ -4,7 +4,9 @@ from datatypes.predicates import Predicate
 
 class AnsicEncoder(object):
 
-    def __init__(self, specDFA):
+    def __init__(self, specDFA, prediction):
+        self.prediction_ = prediction
+
         self.specDFA = specDFA
         self.shieldModel_ = ""
         self.numOfShieldBits_ = 0
@@ -128,7 +130,13 @@ Copyright (c) Meng Wu @2019
         return header
 
     def encode_template(self):
-        template_file = open("inputfiles/template.c")
+        if self.prediction_ == 1:
+            template_file = open("inputfiles/template_linear.c")
+        elif self.prediction_ == 2:
+            template_file = open("inputfiles/template_poly.c")
+        else:
+            return ''
+
         template = template_file.read()
         template_file.close()
         return template
@@ -258,8 +266,40 @@ int main(int argc,char *argv[]){
   fgets(buffer, 100, fp); // skip first line
  
   struct realVar *realv = malloc(test_num * sizeof(struct realVar));
+'''
 
 
+        numberofbool = 0;
+        numberoffloat =0;
+        declare = '  int '
+        assign = '    '
+        target = ''
+        # declare input and output variables
+        for var_name in self.inputNames_:
+            if var_name not in self.specDFA.getPredicates():
+                numberofbool = numberofbool+1
+                declare += 'b_' + var_name +', '
+                assign += "realv[i]." + var_name +' = b_' + var_name + '; '
+                target += '&b_' + var_name + ', '
+        for var_name in self.outputNames_:
+            if var_name[:-3] not in self.specDFA.getPredicates():
+                numberofbool = numberofbool + 1
+                declare += 'b_' + var_name + ', '
+                assign += "realv[i]." + var_name + ' = b_' + var_name + '; '
+                target += '&b_' + var_name + ', '
+
+        assign += '\n    '
+        declare = declare[:-2] + ';\n  float '
+        for var_name in self.predicates_lits:
+            numberoffloat = numberoffloat + 1
+            declare += 'f_' + var_name + ', '
+            assign += "realv[i]." + var_name + ' = f_' + var_name + '; '
+            target += '&f_' + var_name + ', '
+
+
+        fromat = "%d "*numberofbool + "%f "*numberoffloat
+        main_enc += declare[:-2] + ';\n'
+        main_enc += r'''
   for(i=0;i < test_num; i++)
   {
     if (feof(fp))
@@ -268,27 +308,11 @@ int main(int argc,char *argv[]){
       return -1;
     } 
 '''
-        numberofbool = 0;
-        numberoffloat =0;
-        target = ''
-        # declare input and output variables
-        for var_name in self.inputNames_:
-            if var_name not in self.specDFA.getPredicates():
-                numberofbool = numberofbool+1
-                target += "&realv[i]." + var_name +', '
-        for var_name in self.outputNames_:
-            if var_name[:-3] not in self.specDFA.getPredicates():
-                numberofbool = numberofbool + 1
-                target += "&realv[i]." + var_name + ', '
-
-        for var_name in self.predicates_lits:
-            numberoffloat = numberoffloat + 1
-            target += "&realv[i]." + var_name + ', '
-
-        fromat = "%d "*numberofbool + "%f "*numberoffloat
-
         main_enc += '    fscanf(fp, "' + fromat[:-1] + '", ' + target[:-2] + ');\n'
-        main_enc += "  }\n"
+        main_enc += assign
+
+        main_enc += "\n  }\n"
+        main_enc += "  fclose(fp);\n\n"
         main_enc += "  for(i=0;i < test_num; i++){\n"
         main_enc += "    realShield(&realv[i]);\n"
         main_enc += "  }\n}\n\n"
@@ -446,10 +470,10 @@ int main(int argc,char *argv[]){
             ret[1] = 'Z3_mk_mul(ctx, 2, args);\n'
         elif op == '/':
             ret[1] = 'Z3_mk_div(ctx,' + left + ',' + right + ');\n'
-        elif op == '&':
+        elif op == '&' or op == '&&':
             ret[0] = '  args[0] = ' + left + ';\n  args[1] = ' + right + ';\n'
             ret[1] = 'Z3_mk_and(ctx, 2, args);\n'
-        elif op == '|':
+        elif op == '|' or op == '||':
             ret[0] = '  args[0] = '+ left + ';\n  args[1] = ' + right + ';\n'
             ret[1] = 'Z3_mk_or(ctx, 2, args);\n'
         elif op == '%':
@@ -466,6 +490,8 @@ int main(int argc,char *argv[]){
             ret[1] = 'Z3_mk_lt(ctx,' + left + ',' + right + ');\n'
         elif op == '<=':
             ret[1] = 'Z3_mk_le(ctx,' + left + ',' + right + ');\n'
+        elif op == '==':
+            ret[1] = 'Z3_mk_eq(ctx,' + left + ',' + right + ');\n'
         else:
             raise SyntaxError('Invalid operator in predicates!')
         return ret
