@@ -487,10 +487,12 @@ class Synthesizer_kstab(object):
             curr_set_bdd = new_set_bdd
             new_set_bdd = not_error_bdd & self.pre_sys_bdd(curr_set_bdd, self.transition_bdd_)
 
-            print "current state in region:"
-            self.printStatesInBdd((~new_set_bdd) & curr_set_bdd)
-            print "========================"
-
+            # print "removed state:"
+            # self.printStatesInBdd((~new_set_bdd) & curr_set_bdd)
+            # print "========================"
+            # print "safe state in region:"
+            # self.printStatesInBdd(curr_set_bdd)
+            # print "========================"
 
             if (new_set_bdd & self.init_state_bdd_) == self.mgr_.Zero():
                 return self.mgr_.Zero()

@@ -63,8 +63,6 @@ class KStabilizingAlgo(object):
             print("  ...done")
             print("  start building RelaxAutomaton...")
         self.buildRelaxAutomaton()
-        print self.drDFA_
-        print self.fsDFA_
 
     '''
     Creates automata to track the behavior of the design.
@@ -131,8 +129,8 @@ class KStabilizingAlgo(object):
                 etDFA.addEdge(state, targetState, sEdge.getLabel())
 
             #-intersect all edges with spec edges of involved spec states
-            for i in range(1,state.getSubNodeNum()):
-                edges =  state.getOutgoingEdges()
+            for i in range(1, state.getSubNodeNum()):
+                edges = state.getOutgoingEdges()
                 for edge in edges:
                     label = edge.getLabel()
                     sState = state.getSubNode(i)
@@ -158,17 +156,16 @@ class KStabilizingAlgo(object):
                     targetState = etDFA.addNode(targetState)
                     etDFA.changeEdgeTarget(edge, targetState, True)
 
-            edges =  state.getOutgoingEdges()
+            edges = state.getOutgoingEdges()
             for edge in edges:
                 targetState = ErrorTrackingNode(edge.getTargetNode())
-
                 if targetState.isOnlyFinal():
                     #Case 2: If all TargetSStates are errorStates, and designError is 0, set designError to numShieldDeviations_
                     if state.getDesignError() <= 1:
                         #go to any targetState possible with the same input vars
                         newTargetState = ErrorTrackingNode()
                         label = edge.getLabel()
-                        edges2 =  state.getOutgoingEdges()
+                        edges2 = state.getOutgoingEdges()
                         for edge2 in edges2:
                             targetState2 = edge2.getTargetNode()
                             if not targetState2.isOnlyFinal():
@@ -184,6 +181,8 @@ class KStabilizingAlgo(object):
                         if not newTargetState in done and not newTargetState.isOnlyFinal() and not newTargetState in workset:
                             newTargetState = etDFA.addNode(newTargetState)
                             workset.append(newTargetState)
+
+
                     else:
                         #Case 3: Go to error State, and stay there forever
                         etDFA.changeEdgeTarget(edge, errorState, True)
