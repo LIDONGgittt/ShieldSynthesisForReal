@@ -2,7 +2,7 @@ This archive contains the proof-of-concept implementation as well as all the
 input files to reproduce the experiments for the paper 
 
 **Synthesizing 
-Runtime Enforcer of Safety Specification under Burst Error( Submitted to NFM 2016) [ [PDF](https://bitbucket.org/mengwu/shield-synthesis/src/3fd1604121c3/docs/?at=master) ]**. 
+Runtime Enforcer of Safety Specification under Burst Error(NFM 2016) [[PDF](https://bitbucket.org/mengwu/shield-synthesis/src/3fd1604121c3/docs/?at=master) ]**. 
 
 Instructions for reproducing the experiments can be found below. 
 It is based on the tool developped by R. Bloem[1] in TACAS 15'
@@ -115,7 +115,7 @@ Any questions? Do not hesistate to contact the authors of the paper.
 
 Have fun!
 
-[1] R. Bloem, B. KÂ¨onighofer, R. KÂ¨onighofer, and C. Wang. Shield synthesis: Runtime enforcement
+[1] R. Bloem, B. K¨onighofer, R. K¨onighofer, and C. Wang. Shield synthesis: Runtime enforcement
 for reactive systems. In International Conference on Tools and Algorithms for Construction
 and Analysis of Systems. Springer, 2015.
 
