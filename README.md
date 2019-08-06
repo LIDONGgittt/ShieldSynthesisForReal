@@ -17,6 +17,7 @@ make it run, you need to:
  - Add the directory in which you installed PyCUDD to your 
    LD_LIBRARY_PATH and PYTHONPATH environment variables. 
    On Bash-like shells you can do this by typing
+
    ```
    export PYTHONPATH=$PYTHONPATH:/path_to/pycudd2.0.2/pycudd
    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/path_to/pycudd2.0.2/cudd-2.4.2/lib
@@ -30,6 +31,7 @@ Running our synthesis tool:
  - Open a shell in the directory where you extracted this archive. 
  - If you only want to synthesize a shield from a safety specification, then
    executing
+   
    ```
    python ./shield.py -a realgo path/to/spec_automaton.dfa
    ```   
