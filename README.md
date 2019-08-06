@@ -17,25 +17,18 @@ make it run, you need to:
  - Add the directory in which you installed PyCUDD to your 
    LD_LIBRARY_PATH and PYTHONPATH environment variables. 
    On Bash-like shells you can do this by typing
-
-   ```
-   export PYTHONPATH=$PYTHONPATH:/path_to/pycudd2.0.2/pycudd
-   export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/path_to/pycudd2.0.2/cudd-2.4.2/lib
-    ```
    
-   In order to avoid setting these variables each time, you can also add these
-   two lines to the file ~/.bashrc.
+       `export PYTHONPATH=$PYTHONPATH:/path_to/pycudd2.0.2/pycudd` and
+       
+       `export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/path_to/pycudd2.0.2/cudd-2.4.2/lib`
+   
+       In order to avoid setting these variables each time, you can also add thesetwo lines to the file ~/.bashrc.
  
 Running our synthesis tool:
 ===========================
  - Open a shell in the directory where you extracted this archive. 
  - If you only want to synthesize a shield from a safety specification, then
-   executing
-   
-   ```
-   python ./shield.py -a realgo path/to/spec_automaton.dfa
-   ```   
-   should be enough. You can also list several .dfa-files, then the tool
+   executing `python ./shield.py -a realgo path/to/spec_automaton.dfa` should be enough. You can also list several .dfa-files, then the tool
    automatically computes the product automaton. 
 
  - The safety specification automaton is defined with a very simple textual
@@ -61,7 +54,7 @@ Any questions? Do not hesistate to contact the authors of the paper.
 Have fun!
 
 
-[^1]: R. Bloem, B. KÂ¨onighofer, R. KÂ¨onighofer, and C. Wang. Shield synthesis: Runtime enforcement
+[^1]: R. Bloem, B. K¨onighofer, R. K¨onighofer, and C. Wang. Shield synthesis: Runtime enforcement
 for reactive systems. In International Conference on Tools and Algorithms for Construction
 and Analysis of Systems. Springer, 2015.
 
