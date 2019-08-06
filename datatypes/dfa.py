@@ -14,6 +14,7 @@ from datatypes.errorTrackingNode import ErrorTrackingNode
 from datatypes.dfalabel import DfaLabel
 import math
 import time
+import pycudd
 
 DEBUG = 0
 
@@ -127,6 +128,14 @@ class DFA(object):
 
     def getNumEdges(self):
         return len(self.Edges_)
+
+    def getTrueNumEdges(self, sourceNr, targetNr):
+        numedge = 0
+        for edge in self.Edges_:
+            if edge.getSourceNode().getNr() == sourceNr and edge.getTargetNode().getNr() == targetNr:
+                numedge += 1
+        return numedge
+
         
     def setFinalStates(self,finalStates):
         for stateNr in finalStates:
@@ -174,7 +183,7 @@ class DFA(object):
         self.Nodes_.append(node)
         return node
         
-    def getNode(self,nr):
+    def getNode(self, nr):
         for node in self.Nodes_:
             if node.getNr() == nr:
                 return node 
@@ -899,3 +908,4 @@ class DFA(object):
         resultDfa.simplifyEdges()
         resultDfa.predicates_ = self.predicates_
         return resultDfa.standardization()
+

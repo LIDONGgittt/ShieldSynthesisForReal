@@ -1,0 +1,53 @@
+#/**********************************
+# Requirement in the normal mode
+# 1) the level of water tank should keep between 4 and 93, if it;s less than 4, then it will force the inflow open and close the outflow
+# level < 4 -> Always[0,3] Outflow = 0, 1 < Inflow < 3
+# Input: l1, l2
+# Output: I1, O1
+#*********************************
+dfa 6 2 2 1 1 36
+1 #initial state
+5 #final state Error State:5, relaxing state:6
+1 1 1 2 
+1 2 1 -2 3 4 
+1 5 1 -2 3 -4
+1 5 1 -2 -3
+1 6 -1
+2 3 3 4 1 -2
+2 3 3 4 1 2
+2 6 3 4 -1 -2
+2 6 3 4 -1 2
+2 5 3 -4 1 -2
+2 5 3 -4 1 2
+2 6 3 -4 -1 -2
+2 6 3 -4 -1 2
+2 5 -3 1 -2
+2 5 -3 1 2 
+2 6 -3 -1 -2
+2 6 -3 -1 2
+3 4 3 4 1 -2 
+3 4 3 4 1 2
+3 6 3 4 -1 -2 # -1 condition (level < 0) won;t happen, so it will be relaxed:6
+3 6 3 4 -1 2
+3 5 3 -4 1 -2 # output condition (3, -4) is wrong and will result in the error state:5
+3 5 3 -4 1 2
+3 6 3 -4 -1 -2
+3 6 3 -4 -1 2
+3 5 -3 1 -2
+3 5 -3 1 2
+3 6 -3 -1 -2
+3 6 -3 -1 2
+4 2 1 -2 3 4 
+4 5 1 -2 3 -4
+4 5 1 -2 -3
+4 1 1 2
+4 6 -1
+5 5 
+6 6 
+1 l1 (level > 0) #input the level of the water tank
+2 l2 (level >= 4) #input
+3 I1 (inflow > 1 & inflow < 2) #output the inflow of the water tank
+4 O1 (outflow == 0) #outout the outflow of the water tank
+
+# (1,2) (4) (5)
+# conflict (-1 2) 

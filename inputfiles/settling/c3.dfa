@@ -1,0 +1,17 @@
+#/***********************************************************
+# Requirement of general control system
+# 3) Always ( step_input => Always_[ 0, 2*settling_time ] ( error[t] > max_undershoot ) )
+#
+#************************************************************/
+dfa 4 1 1 1 1 7
+1 #initial
+3 #final
+1 1 1 2
+1 3 1 -2
+1 2 -1
+2 4 1 # time cannot go backwards
+2 2 -1
+4 4
+3 3 
+1 ts2 (t>0 & t< 20) # input, 0< t< 2*settling_time(=10s), !ts means 20 <= t < inf
+2 eu (e > -8) # output, e = (x - ref)/ref, eu = e >-8

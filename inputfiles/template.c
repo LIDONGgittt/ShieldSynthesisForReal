@@ -4,6 +4,12 @@ typedef struct lin_reg
     float b;
 } lin_reg;
 
+// global solver variables
+Z3_context gctx;
+Z3_solver gsolver;
+
+
+
 //--------------------------------------------------------
 // FUNCTION PROTOTYPES
 //--------------------------------------------------------
@@ -251,13 +257,14 @@ void realShield(struct realVar *var){
   shield(&bv);
 
   if(equal(&bv)){
-    printf("shield not interfere!\n");
+    //printf("shield not interfere!\n");
+    var->result = 3;
     still(var);
   }
   else{
     linearReg(var, &hist);
-    printf("after linearReg func\n");
-    lp(&bv,var);
+    //printf("after linearReg func\n");
+    var->result = lp(&bv,var);
   }
   updateHis(var, &hist);
 }

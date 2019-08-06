@@ -32,8 +32,8 @@ dfa 5 4 1 1 1 20
 5 5 1 -2 3
 5 3 -1 -2
 5 3 2
-1 ts      #input
-2 T       #input
+1 ts     (t>20) #input ts =20
+2 T      (t>220) #input T=220
 3 l1      #input
 4 l2      #input
 5 u02     (u > 0.2 | u < -0.2)#output

@@ -471,6 +471,7 @@ class Synthesizer(object):
         for dev_state in self.deviation_dfa_.getNodes():
             for et_state in self.error_tracking_dfa_.getNodes():
                 for cor_state in self.correctness_dfa_.getNodes():
+
                 
                     state_bdd_1 = self.make_node_state_bdd(dev_state.getNr()-1, self.deviation_dfa_)
                     state_bdd_2 = self.make_node_state_bdd(et_state.getNr()-1, self.error_tracking_dfa_)

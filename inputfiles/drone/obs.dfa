@@ -1,0 +1,41 @@
+#/***********************************************************
+# Requirement of drone control
+# 1) when there is no obstacles on the way, fly directly to the goal position
+#
+#************************************************************/
+
+dfa 4 2 2 1 1 28
+1 # inital state
+4 # error state
+1 1 -1
+1 2 1 -2 3 4 # if there is obs, fly close to it and at the same time around it
+1 4 1 -2 -3 -4
+1 4 1 -2 -3 4
+1 4 1 -2 3 -4
+1 3 1 2 -3 4 # if already too close to obs, only fly to the tangent direction,
+1 4 1 2 3 4
+1 4 1 2 3 -4
+1 4 1 2 -3 -4
+2 2 1 -2 3 4
+2 4 1 -2 -3 -4
+2 4 1 -2 -3 4
+2 4 1 -2 3 -4
+2 1 -1
+2 3 1 2 -3 4
+2 4 1 2 3 4
+2 4 1 2 3 -4
+2 4 1 2 -3 -4
+3 3 1 2 -3 4
+3 4 1 2 3 4
+3 4 1 2 3 -4
+3 4 1 2 -3 -4
+3 1 -1
+3 2 1 -2 3 4
+3 4 1 -2 -3 -4
+3 4 1 -2 -3 4
+3 4 1 -2 3 -4
+4 4
+1 obs # input, there is obstacle(a region on R(x,y)) on the way of current drone position(x1, y1) of goal position(x2, y2)
+2 d (d < 0.5)# input, distance to the obstancle is less than 0.5m
+3 wg (vg > 0) #output, the linear velocity towards the direction of goal
+4 wt (vt >0 ) #output, the linear velocity tangent to the obstacle

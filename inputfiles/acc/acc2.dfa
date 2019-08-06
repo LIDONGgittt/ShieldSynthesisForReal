@@ -1,0 +1,32 @@
+#/***********************************************************
+# Requirement in the normal mode
+# 1) safe distance
+# always(pos_lead[t] - pos_ego[t] > d_safe) d_safe is some fixed distance
+# 2) cruise-model
+# (pos_lead[t] – pos_ego[t] > d_cruise)  Until_[0,10]  (abs(v_ego[t] – v_cruise) < v_tol )
+# 3) vehicle doesn't travel backward
+# Always(v_ego[t]) >= 0
+# 4) vehicle doesn;t halt unless the lead vechicles halt
+# Always(v_lead[t] > 0 => v_ego[t] > 0)
+# 5) when d_safe < d < d_cruise, always (-2 < a_lead[t] < 2)
+# 6) v_cruise, d_cruise, v_tol are the fixed value.
+# we assume v_tol = 1.5, d_cruise = 10, d_safe = 6
+# input: d1, d2, v2, a1, t1, t2, t3
+# output: v1, v3, a2, v4 
+#************************************************************/
+
+dfa 3 2 1 1 1 9
+1 # inital state
+3 # error state
+1 1 -1 -2 # smaller cruise distance
+1 4 2 # timer cannot set in s1
+1 2 1 -2 # beyond cruise distance
+2 2 1 -2 # can behave arbitrarily within timer
+2 2 1 2 3 # reached desired speed
+2 3 1 2 -3 # didn't make it within timer
+2 1 -1 # too near to lead vehicle
+3 3
+4 4
+1 dc ((pos_lead - pos_ego) > 20) # input, distance between lead vehicle larger than d_cruise(= 20m) 
+2 tn (t>10) # input, t is a timer indicating the time after dc detected. reset after dc is not satisfied
+3 vc (v_ego  <= 81 & v_ego >= 79)   # |v_ego - v_cruise| <= v_lot(=1mph) output, ego speed is close(~1mph) to desired speed v_cruise (=80mph)

@@ -7,6 +7,11 @@ typedef struct lin_reg
     float b;
 } lin_reg;
 
+// global solver variables
+Z3_context gctx;
+Z3_solver gsolver;
+
+
 //--------------------------------------------------------
 // FUNCTION PROTOTYPES
 //--------------------------------------------------------

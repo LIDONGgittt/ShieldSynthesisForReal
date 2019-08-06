@@ -46,6 +46,13 @@ class AnsicEncoder(object):
                 self.predicates_out[var_name] = predicate_ast
                 self.predicates_lits_out = self.predicates_lits_out.union(predicate_ast.getLits())
 
+    def get_pred_lits(self, out=False):
+        if out:
+            return self.predicates_lits_out
+        else:
+            return self.predicates_lits
+
+
     """
     Stores DFA in global variables
     """
@@ -124,6 +131,7 @@ Copyright (c) Meng Wu @2019
 #include <stdbool.h>
 #include <string.h>
 #include <math.h>
+#include <time.h>
 
 
 '''
@@ -176,7 +184,7 @@ Copyright (c) Meng Wu @2019
         for var_name in self.predicates_lits_out:
             var_enc += "  float " + var_name + "__1;  //real variables output\n"
 
-        var_enc += "};\n\n"
+        var_enc += "  int result; //for testing\n};\n\n"
 
         return var_enc
 
@@ -238,9 +246,9 @@ Copyright (c) Meng Wu @2019
     def encode_func_updateHis(self):
         func_enc = "void updateHis(struct realVar *var, struct hist_t *hist){\n"
         for var_name in self.predicates_lits_out:
-            func_enc += "  for(int i=0; i < " + str(self.hist_len-2) + "; i++) " \
+            func_enc += "  for(int i=0; i < " + str(self.hist_len-1) + "; i++) " \
                         "hist->" + var_name + "__1[i] = hist->" + var_name + "__1[i+1];\n"
-            func_enc += "  hist->" + var_name + "__1[" + str(self.hist_len-1) + "] = var->" + var_name +";\n"
+            func_enc += "  hist->" + var_name + "__1[" + str(self.hist_len-1) + "] = var->" + var_name +"__1;\n"
 
         func_enc += "}\n\n"
         return func_enc
@@ -261,7 +269,11 @@ int main(int argc,char *argv[]){
       fprintf(stderr, "! Error: faild to open file \n" );
       return -1;
   }
-
+  
+  gctx = mk_context();
+  gsolver = mk_solver(gctx);
+  clock_t start, end;
+  
   char buffer[100];
   fgets(buffer, 100, fp); // skip first line
  
@@ -281,15 +293,19 @@ int main(int argc,char *argv[]){
                 declare += 'b_' + var_name +', '
                 assign += "realv[i]." + var_name +' = b_' + var_name + '; '
                 target += '&b_' + var_name + ', '
-        for var_name in self.outputNames_:
-            if var_name[:-3] not in self.specDFA.getPredicates():
-                numberofbool = numberofbool + 1
-                declare += 'b_' + var_name + ', '
-                assign += "realv[i]." + var_name + ' = b_' + var_name + '; '
-                target += '&b_' + var_name + ', '
+        # for var_name in self.outputNames_:
+        #     if var_name[:-3] not in self.specDFA.getPredicates():
+        #         numberofbool = numberofbool + 1
+        #         declare += 'b_' + var_name + ', '
+        #         assign += "realv[i]." + var_name + ' = b_' + var_name + '; '
+        #         target += '&b_' + var_name + ', '
 
         assign += '\n    '
-        declare = declare[:-2] + ';\n  float '
+
+        if numberofbool < 1:
+            declare = '  float '
+        else:
+            declare = declare[:-2] + ';\n  float '
         for var_name in self.predicates_lits:
             numberoffloat = numberoffloat + 1
             declare += 'f_' + var_name + ', '
@@ -311,12 +327,26 @@ int main(int argc,char *argv[]){
         main_enc += '    fscanf(fp, "' + fromat[:-1] + '", ' + target[:-2] + ');\n'
         main_enc += assign
 
-        main_enc += "\n  }\n"
-        main_enc += "  fclose(fp);\n\n"
-        main_enc += "  for(i=0;i < test_num; i++){\n"
-        main_enc += "    realShield(&realv[i]);\n"
-        main_enc += "  }\n}\n\n"
+        main_enc += r'''
+  }
+  fclose(fp);
 
+  for(i=0;i < test_num; i++){
+    start = clock();
+    realShield(&realv[i]);
+    end = clock() - start;
+
+    if (realv[i].result == 0)
+      printf("linear took %ld us.\n", end); 
+    else if (realv[i].result == 1)
+      printf("lp solver took %ld us.\n", end); 
+    else
+      printf("non-interfer took %ld us.\n", end); 
+    // printf("new u is %f.\n", realv[i].u__1);
+  }
+}
+        
+        '''
         return main_enc
 
     def encode_model(self, num_of_bits, tmp_count):
@@ -354,14 +384,14 @@ int main(int argc,char *argv[]){
         assertions = '  //assert predicates constrains\n'
         for var_name in self.predicates_out:
             assertion, ast = self.solver_assert(self.predicates[var_name])
-            assertion += '  if(bvar->' + var_name+'__1) Z3_solver_assert(ctx, s,' + ast + ');\n'
-            assertion += '  else Z3_solver_assert(ctx, s, Z3_mk_not(ctx,' + ast + '));\n\n'
+            assertion += '  if(bvar->' + var_name+'__1) Z3_solver_assert(gctx, gsolver,' + ast + ');\n'
+            assertion += '  else Z3_solver_assert(gctx, gsolver, Z3_mk_not(gctx,' + ast + '));\n\n'
             assertions += assertion
 
-        assertions += '  Z3_solver_push(ctx, s);  //checkpoint for backtracking\n\n  //check linear reg result\n'
+        assertions += '  Z3_solver_push(gctx, gsolver);  //checkpoint for backtracking\n\n  //check linear reg result\n'
 
         for lit in self.predicates_lits_out:
-            assertions += '  Z3_solver_assert(ctx, s, Z3_mk_eq(ctx,'+ lit + ', Z3_mk_real(ctx, (int)(rvar->' +lit + '__1*1000), 1000)));\n'
+            assertions += '  Z3_solver_assert(gctx, gsolver, Z3_mk_eq(gctx,'+ lit + ', Z3_mk_real(gctx, (int)(rvar->' +lit + '__1*1000), 1000)));\n'
 
         func_enc += assertions
         func_enc += self.solver_check()
@@ -370,57 +400,54 @@ int main(int argc,char *argv[]){
 
 
     def solver_init(self):
-        init = '  //initial z3 solver \n'
-        init +=  '  Z3_context ctx;\n'
-        init += '  Z3_solver s;\n'
-        init += '  Z3_model m = 0;\n'
+
+        init = '  Z3_model m = 0;\n'
         init += '  Z3_ast args[2];\n'
         init += '  int64_t num, den;\n  Z3_ast v;\n'
-        init += '  ctx = mk_context();\n'
-        init += '  s = mk_solver(ctx);\n'
+        init += '  Z3_solver_push(gctx, gsolver);  //checkpoint with a clean solver\n'
         for lit in self.predicates_lits_out:
-            init += '  Z3_ast ' + lit + ' = mk_real_var(ctx, "' + lit + '");\n'
+            init += '  Z3_ast ' + lit + ' = mk_real_var(gctx, "' + lit + '");\n'
 
         return init+"\n"
 
     def solver_cc(self): # check & clean solver
-        check = '  check(ctx, s);\n'
-        check += '  del_solver(ctx, s);\n'
-        check += '  Z3_del_context(ctx);\n'
+        check = '  check(gctx, gsolver);\n'
+        check += '  del_solver(gctx, gsolver);\n'
+        check += '  Z3_del_context(gctx);\n'
         check += '\n}\n'
         return check
 
     def solver_check(self):  # check feasibility
         check = '''
-  if (Z3_solver_check(ctx, s) == Z3_L_TRUE){
-    printf("sat with linear reg algo.\\n");
-    del_solver(ctx, s);
-    Z3_del_context(ctx);
+  if (Z3_solver_check(gctx, gsolver) == Z3_L_TRUE){
+    Z3_solver_pop(gctx, gsolver, 2); // reset solver to empty assertions
+    //printf("sat with linear reg algo.\\n");
     return 0;
   }
   else{
-    Z3_solver_pop(ctx, s, 1); // remove linear reg constrains
+    Z3_solver_pop(gctx, gsolver, 1); // remove linear reg constrains
     // try to solve lp directly
-    if (Z3_solver_check(ctx, s) == Z3_L_TRUE){
-      m = Z3_solver_get_model(ctx, s);
+    if (Z3_solver_check(gctx, gsolver) == Z3_L_TRUE){
+      m = Z3_solver_get_model(gctx, gsolver);
       //assign model to realVar
 '''
         for lit in self.predicates_lits_out:
-            check += '      if(Z3_model_eval(ctx, m, ' + lit +', 1, &v)){\n'
-            check += '        Z3_get_numeral_rational_int64(ctx, v,&num, &den);\n'
+            check += '      if(Z3_model_eval(gctx, m, ' + lit +', 1, &v)){\n'
+            check += '        Z3_get_numeral_rational_int64(gctx, v,&num, &den);\n'
             check += '        rvar->' + lit + '__1 = ((float)num)/((float)den);\n'
             check += '      }\n'
             check += '      else{\n'
+            check += '         printf("Error: failed to eval model.\\n");\n'
             check += '        //fail to eval\n'
             check += '      }\n'
 
         check += '''
-      //printf("sat\\n%s\\n", Z3_model_to_string(ctx, m));
-      del_solver(ctx, s);
-      Z3_del_context(ctx);
+      Z3_solver_pop(gctx, gsolver, 1); // reset solver to empty assertions
+      //printf("sat\\n%s\\n", Z3_model_to_string(gctx, m));
       return 1;
     }
     else{
+      Z3_solver_pop(gctx, gsolver, 1); // reset solver to empty assertions
       printf("Error: failed to get real value.\\n");
       return 2;
     }
@@ -445,11 +472,11 @@ int main(int argc,char *argv[]){
             ast_name = predicate.getValue()
         elif predicate.getType() == 1:
             ast_name = 'ast_' + str(self.count)
-            assertion = '  Z3_ast ' + ast_name + ' = mk_int(ctx, ' + predicate.getValue() + ');\n'
+            assertion = '  Z3_ast ' + ast_name + ' = mk_int(gctx, ' + predicate.getValue() + ');\n'
             self.count += 1
         elif predicate.getType() == 2:
             ast_name = 'ast_' + str(self.count)
-            assertion = '  Z3_ast ' + ast_name + ' = Z3_mk_numeral(ctx, "' + predicate.getValue() + '",Z3_mk_real_sort(ctx));\n'
+            assertion = '  Z3_ast ' + ast_name + ' = Z3_mk_numeral(gctx, "' + predicate.getValue() + '",Z3_mk_real_sort(gctx));\n'
             self.count += 1
 
 
@@ -461,37 +488,37 @@ int main(int argc,char *argv[]){
 
         if op == '+':
             ret[0] = '  args[0] = ' + left + ';\n  args[1] = ' + right + ';\n'
-            ret[1] = 'Z3_mk_add(ctx, 2, args);\n'
+            ret[1] = 'Z3_mk_add(gctx, 2, args);\n'
         elif op == '-':
             ret[0] = '  args[0] = ' + left + ';\n  args[1] = ' + right + ';\n'
-            ret[1] = 'Z3_mk_sub(ctx, 2, args);\n'
+            ret[1] = 'Z3_mk_sub(gctx, 2, args);\n'
         elif op == '*':
             ret[0] = '  args[0] = '+ left + ';\n  args[1] = ' + right + ';\n'
-            ret[1] = 'Z3_mk_mul(ctx, 2, args);\n'
+            ret[1] = 'Z3_mk_mul(gctx, 2, args);\n'
         elif op == '/':
-            ret[1] = 'Z3_mk_div(ctx,' + left + ',' + right + ');\n'
+            ret[1] = 'Z3_mk_div(gctx,' + left + ',' + right + ');\n'
         elif op == '&' or op == '&&':
             ret[0] = '  args[0] = ' + left + ';\n  args[1] = ' + right + ';\n'
-            ret[1] = 'Z3_mk_and(ctx, 2, args);\n'
+            ret[1] = 'Z3_mk_and(gctx, 2, args);\n'
         elif op == '|' or op == '||':
             ret[0] = '  args[0] = '+ left + ';\n  args[1] = ' + right + ';\n'
-            ret[1] = 'Z3_mk_or(ctx, 2, args);\n'
+            ret[1] = 'Z3_mk_or(gctx, 2, args);\n'
         elif op == '%':
-            ret[1] = 'Z3_mk_rem(ctx,' + left + ',' + right + ');\n'
+            ret[1] = 'Z3_mk_rem(gctx,' + left + ',' + right + ');\n'
         # elif op == 'mod':
-        #     ret[1] = 'Z3_mk_mod(ctx,'+ left + ',' + right + ');\n'
+        #     ret[1] = 'Z3_mk_mod(gctx,'+ left + ',' + right + ');\n'
         elif op == '^':
-            ret[1] = 'Z3_mk_pow(ctx,'+ left + ',' + right + ');\n'
+            ret[1] = 'Z3_mk_pow(gctx,'+ left + ',' + right + ');\n'
         elif op == '>':
-            ret[1] = 'Z3_mk_gt(ctx,'+ left + ',' + right + ');\n'
+            ret[1] = 'Z3_mk_gt(gctx,'+ left + ',' + right + ');\n'
         elif op == '>=':
-            ret[1] = 'Z3_mk_ge(ctx,' + left + ',' + right + ');\n'
+            ret[1] = 'Z3_mk_ge(gctx,' + left + ',' + right + ');\n'
         elif op == '<':
-            ret[1] = 'Z3_mk_lt(ctx,' + left + ',' + right + ');\n'
+            ret[1] = 'Z3_mk_lt(gctx,' + left + ',' + right + ');\n'
         elif op == '<=':
-            ret[1] = 'Z3_mk_le(ctx,' + left + ',' + right + ');\n'
+            ret[1] = 'Z3_mk_le(gctx,' + left + ',' + right + ');\n'
         elif op == '==':
-            ret[1] = 'Z3_mk_eq(ctx,' + left + ',' + right + ');\n'
+            ret[1] = 'Z3_mk_eq(gctx,' + left + ',' + right + ');\n'
         else:
             raise SyntaxError('Invalid operator in predicates!')
         return ret

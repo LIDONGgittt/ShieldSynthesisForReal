@@ -103,8 +103,8 @@ USAGE
                             help="override the allowed deviation(assigned to 1 means must be greater than 1). Only valid when algorithm is set to ksalgo.[default: 1]",
                             type=int, default=1)
         parser.add_argument("-p", "--prediction", dest="prediction",
-                            help="which algorithm should be used for prediction. Support none (use lp solver directly), linear(linear line regression) or poly (polynomial curve fitting)[default: poly]",
-                            default="poly")
+                            help="which algorithm should be used for prediction. Support none (use lp solver directly), linear(linear line regression) or poly (polynomial curve fitting)[default: linear]",
+                            default="linear")
         parser.add_argument('spec_file', nargs='+')
 
         # Process arguments
@@ -243,6 +243,9 @@ USAGE
     # and synthesize output functions for shield
     allowed_burst = 0
 
+    num_fsDfa_edges = 0
+    num_reDfa_edges = 0
+
     if shield_algorithm == BURST_ERROR_ALGORITHM:
         algorithm = BurstErrorAlgo(spec_dfa, allowed_burst)
         automata_time = round(time.time() - t_total,2)
@@ -294,6 +297,9 @@ USAGE
             synthesis.synthesize()
     else:  # shield_algorithm == REAL_ALGORITHM
         algorithm = KStabilizingAlgo(spec_dfa, allowed_dev)
+
+        num_fsDfa_edges = algorithm.fsDFA_.getTrueNumEdges(1, 2)
+        num_reDfa_edges = algorithm.drDFA_.getTrueNumEdges(1, 2)
 
         cur_time = time.time()
         automata_time = round(cur_time - t_total, 2)
@@ -358,6 +364,9 @@ USAGE
         with open(output_file_name+".c", "w+") as text_file:
             text_file.write(ansic_str)
 
+        num_real_io = len(ansic_encoder.get_pred_lits())
+        num_real_o = len(ansic_encoder.get_pred_lits(True))
+
 
     #print final message
     total_time = round(time.time() - t_total, 2)
@@ -371,8 +380,24 @@ USAGE
     if verify:
         print("*** Time for synthesis: " + str(total_time-verify_time))
         print("*** Time for verification: " + str(verify_time))
+
+    if shield_algorithm == REAL_ALGORITHM:
+        num_pred_io = algorithm.drDFA_.getNumInputVars()
+        num_pred_o = algorithm.fsDFA_.getNumOutputVars()
+
+        print("*** num real inputs: " + str(num_real_io - num_real_o))
+        print("*** num real outputs: " + str(num_real_o))
+
+        print("*** num predicates inputs: " + str(num_pred_io - num_pred_o))
+        print("*** num predicates outputs: " + str(num_pred_o))
+
+        print("*** num relax edges: " + str(num_reDfa_edges))
+        print("*** num infeasible edges: " + str(num_fsDfa_edges))
+
+
+
     print("*** Total execution time: " + str(total_time))
-    print("*** Num wining states: "+ str(synthesis.winStateNum)+"/"+str(synthesis.allStateNum))
+    print("*** Num wining states: " + str(synthesis.winStateNum)+"/"+str(synthesis.allStateNum))
     print("******************************************")
 
     if result:

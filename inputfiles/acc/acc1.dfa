@@ -1,0 +1,29 @@
+#/***********************************************************
+# Requirement in the normal mode
+# 1) safe distance
+# always(pos_lead[t] - pos_ego[t] > d_safe) d_safe is some fixed distance
+# 2) cruise-model
+# (pos_lead[t] – pos_ego[t] > d_cruise)  Until_[0,10]  (abs(v_ego[t] – v_cruise) < v_tol )
+# 3) vehicle doesn't travel backward
+# Always(v_ego[t]) >= 0
+# 4) vehicle doesn;t halt unless the lead vechicles halt
+# Always(v_lead[t] > 0 => v_ego[t] > 0)
+# 5) when d_safe < d < d_cruise, always (-2 < a_lead[t] < 2)
+# 6) v_cruise, d_cruise, v_tol are the fixed value.
+# we assume v_tol = 1.5, d_cruise = 10, d_safe = 6
+# input: d1, d2, v2, a1, t1, t2, t3
+# output: v1, v3, a2, v4 
+#************************************************************/
+
+dfa 3 1 1 1 1 6
+1 # inital state
+3 # error state
+1 1 1 # large than safe distance
+1 2 -1 2 # reach safe distance, slow down
+2 2 -1 2 # in reality, should not stay at s2, since distance will enlarge immediately to be larger than safe distance. however, leave the slow down behavior here
+2 1 1
+1 3 -1 -2
+2 3 -1 -2
+3 3
+1 ds ((pos_lead - pos_ego) > 5) # input, distance between lead vehicle larger than d_safe(= 5m) 
+2 va # (v_ego <= v_lead) #output, ego speed less or equal than lead vehicle, since v_lead is input not constant, leave it a boolean

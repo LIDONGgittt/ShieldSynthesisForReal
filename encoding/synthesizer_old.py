@@ -81,6 +81,9 @@ class Synthesizer_kstab(object):
         self.max_tmp_count = 1
         self.result_model_ = ""
 
+        self.winStateNum = 0
+        self.allStateNum = 0
+
     def synthesize_real(self):
 
         synthe_0 = time.time()
@@ -521,19 +524,23 @@ class Synthesizer_kstab(object):
 
     def getWinStateNum(self, strategy):
         self.winStateNum = 0
-        self.allStateNum = len(self.deviation_dfa_.getNodes()) *len(self.error_tracking_dfa_.getNodes()) *len(self.correctness_dfa_.getNodes())
+        self.allStateNum = 0
         for dev_state in self.deviation_dfa_.getNodes():
             for et_state in self.error_tracking_dfa_.getNodes():
                 for cor_state in self.correctness_dfa_.getNodes():
-                
-                    state_bdd_1 = self.make_node_state_bdd(dev_state.getNr()-1, self.deviation_dfa_)
-                    state_bdd_2 = self.make_node_state_bdd(et_state.getNr()-1, self.error_tracking_dfa_)
-                    state_bdd_3 = self.make_node_state_bdd(cor_state.getNr()-1, self.correctness_dfa_)
-                    
-                    state_bdd = state_bdd_1 & state_bdd_2 &state_bdd_3
+                    for fs_state in self.feasibility_dfa_.getNodes():
+                        for relax_state in self.relax_dfa_.getNodes():
 
-                    if (state_bdd & strategy) != self.mgr_.Zero():
-                        self.winStateNum +=1
+                            state_bdd_1 = self.make_node_state_bdd(dev_state.getNr()-1, self.deviation_dfa_)
+                            state_bdd_2 = self.make_node_state_bdd(et_state.getNr()-1, self.error_tracking_dfa_)
+                            state_bdd_3 = self.make_node_state_bdd(cor_state.getNr()-1, self.correctness_dfa_)
+                            state_bdd_4 = self.make_node_state_bdd(fs_state.getNr() - 1, self.feasibility_dfa_)
+                            state_bdd_5 = self.make_node_state_bdd(relax_state.getNr() - 1, self.relax_dfa_)
+
+                            state_bdd = state_bdd_1 & state_bdd_2 & state_bdd_3 & state_bdd_4 & state_bdd_5
+                            self.allStateNum += 1
+                            if (state_bdd & strategy) != self.mgr_.Zero():
+                                self.winStateNum += 1
 
 
     def suc_sys_bdd(self, src_states_bdd, transition_bdd):

@@ -23,10 +23,10 @@ class DfaEdge(object):
         return retVal
   
     def setSourceNode(self,newSourceNode):
-        self.sourceNode_=newSourceNode
+        self.sourceNode_ = newSourceNode
 
     def setTargetNode(self,newTargetNode):
-        self.targetNode_=newTargetNode
+        self.targetNode_ = newTargetNode
         
     def getSourceNode(self):
         return self.sourceNode_
@@ -36,4 +36,8 @@ class DfaEdge(object):
     
     def getLabel(self):
         return self.label_
-    
+
+    def getNumLabels(self, numLits):
+        if (numLits - len(self.label_.getLiterals())) < 0:
+            raise Exception('calculate number of true edges, but argument is wrong!')
+        return pow(2, numLits - len(self.label_.getLiterals()))

@@ -1,0 +1,60 @@
+#/********************************************
+# Requirement in the normal mode
+# 1) the bolus should be taken t1 time before having the meal or t2 time after having the meal
+# Eventually(0, t1+t2) B > c2 Or Always[t1, t1+t2) M > c1 -> Eventually (0, t2) B > c2
+# Input: t1 t2 cnt1 cnt2 M1
+# Output: B1
+# Assuming: t1 = 5s, t2 = 7s, c1 = 0.4697, c2 = 0.1 (referring to paper)
+#*********************************************
+dfa 5 5 1 1 1 38
+1 #initial state
+4 # final state, Error State: 4, Relaxing State: 5
+1 1 3 -4 -1 -2 
+1 5 3 4 -1 -2 
+1 5 -3 -1 -2 
+1 5 -1 2
+1 3 1 -2 3 -4 5 -6
+1 5 1 -2 3 4 5 -6
+1 5 1 -2 -3 5 -6
+1 2 1 -2 3 -4 5 6 
+1 5 1 -2 3 4 5 6 
+1 5 1 -2 -3 4 5 6 
+1 5 1 -2 -3 -4 5 6 
+1 5 1 -2 3 -4 -5 -6   # No Meal(-5), No Blous (-6)
+1 5 1 -2 3 4 -5 -6 
+1 5 1 -2 -3 4 -5 -6
+1 5 1 -2 -3 -4 -5 -6
+1 2 1 -2 3 -4 -5 6
+1 5 1 -2 3 4 -5 6 
+1 5 1 -2 -3 4 -5 6
+1 5 1 -2 -3 -4 -5 6 
+1 5 1 2 
+2 2 1 2 3 -4
+2 5 1 2 3 4 
+2 2 1 2 -3
+2 2 1 -2 3 -4
+2 5 1 -2 3 4
+2 2 1 -2 -3
+2 1 -1 -2 3 -4
+2 5 -1 -2 3 4
+2 5 -1 -2 -3
+2 5 -1 2
+3 4 1 2 -3 4 5 -6
+3 4 1 -2 -3 4 5 -6
+3 5 -1 -3 4 5 -6
+3 2 1 2 -3 4 5 6
+3 2 1 -2 -3 4 5 6
+3 5 -1 -3 4 5 6
+3 5 -3 4 -5
+3 5 -3 -4
+3 5 3
+4 4
+5 5
+1 t1 (t >= 5) #input
+2 t2 (t >= 12) #input t > (t1+t2) => t > 12s
+3 cnt1 (cnt == 0) #input
+4 cnt2 (cnt > 0 & cnt < 7) #input
+5 M1 (M > 0.1) #input
+6 B1 (B > 0.4697) #output the blous the patients need to take
+# (1,2) (3,4) (5) (6)
+# confliction: (-1, 2), (3, 4) 
