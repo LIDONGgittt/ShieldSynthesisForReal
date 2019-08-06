@@ -67,4 +67,4 @@ Have fun!
 for reactive systems. In International Conference on Tools and Algorithms for Construction
 and Analysis of Systems. Springer, 2015.
 
-[^2]: Wu M, Zeng H, Wang C. Synthesizing runtime enforcer of safety properties under burst error[C]//NASA Formal Methods Symposium. Springer, Cham, 2016: 65-81. 
+[^2]: Wu M, Zeng H, Wang C. Synthesizing runtime enforcer of safety properties under burst error. NASA Formal Methods Symposium. Springer, Cham, 2016: 65-81. 
