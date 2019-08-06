@@ -17,10 +17,10 @@ make it run, you need to:
  - Add the directory in which you installed PyCUDD to your 
    LD_LIBRARY_PATH and PYTHONPATH environment variables. 
    On Bash-like shells you can do this by typing
-   
-   >> `export PYTHONPATH=$PYTHONPATH:/path_to/pycudd2.0.2/pycudd`
-
-   >> `export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/path_to/pycudd2.0.2/cudd-2.4.2/lib`
+   ```
+   export PYTHONPATH=$PYTHONPATH:/path_to/pycudd2.0.2/pycudd
+   export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/path_to/pycudd2.0.2/cudd-2.4.2/lib
+    ```
    
    In order to avoid setting these variables each time, you can also add these
    two lines to the file ~/.bashrc.
@@ -30,9 +30,9 @@ Running our synthesis tool:
  - Open a shell in the directory where you extracted this archive. 
  - If you only want to synthesize a shield from a safety specification, then
    executing
-
-   >> `> python ./shield.py -a realgo path/to/spec_automaton.dfa`
-   
+   ```
+   python ./shield.py -a realgo path/to/spec_automaton.dfa
+   ```   
    should be enough. You can also list several .dfa-files, then the tool
    automatically computes the product automaton. 
 
@@ -45,15 +45,11 @@ Running our synthesis tool:
 
  - To run the old tool by R. Bloem[^1], use option -a ksalgo, or run the previous NFM2016 tool[^2] use option -a bealgo
 
- - More usage of the tool, executing
- 
-   >> `> python ./shield.py -h`
-   
-   to get a list of command-line arguments and more help messages.
+ - More usage of the tool, executing `python ./shield.py -h` to get a list of command-line arguments and more help messages.
  
 Reproducing the results from the paper:
 =======================================
-simply use our script `> ./real_test.sh` 
+simply use our script `./real_test.sh` 
 
 TBD: the input data and runtime evaluation for synthesized shield program is under preparation!
   
