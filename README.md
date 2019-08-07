@@ -21,7 +21,7 @@ make it run, you need to:
        
        `export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/path_to/pycudd2.0.2/cudd-2.4.2/lib`
    
-       In order to avoid setting these variables each time, you can also add thesetwo lines to the file ~/.bashrc.
+       In order to avoid setting these variables each time, you can also add these two lines to the file ~/.bashrc.
  
 Running our synthesis tool:
 ===========================
