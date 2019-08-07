@@ -26,9 +26,11 @@ make it run, you need to:
 Running our synthesis tool:
 ===========================
  - Open a shell in the directory where you extracted this archive. 
- - If you only want to synthesize a shield from a safety specification, then
-   executing `python ./shield.py -a realgo path/to/spec_automaton.dfa` should be enough. You can also list several .dfa-files, then the tool
-   automatically computes the product automaton. 
+ - If you only want to synthesize a shield from a safety specification, then executing 
+ 
+       `python ./shield.py -a realgo path/to/spec_automaton.dfa` 
+       
+       should be enough. You can also list several .dfa-files, then the tool automatically computes the product automaton. 
 
  - The safety specification automaton is defined with a very simple textual
    format. This format is described in the file docs/InputFormat.txt.
