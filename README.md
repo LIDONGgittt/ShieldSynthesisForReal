@@ -1,8 +1,7 @@
 This archive contains the proof-of-concept implementation as well as all the 
 input files to reproduce the experiments for the paper 
 
-**Synthesizing 
-Shield Synthesis for Real: Enforcing Safety in Cyber-Physical Systems(FMCAD 2019) [ [PDF](./docs/WuWDW19.pdf) ]**. 
+**Synthesizing Shield Synthesis for Real: Enforcing Safety in Cyber-Physical Systems(FMCAD 2019) [[PDF](./docs/WuWDW19.pdf) ]**. 
 
 Instructions for reproducing the experiments can be found below. 
 It is based on the tool developped by R. Bloem[^1] in TACAS 15'
@@ -25,10 +24,12 @@ make it run, you need to:
     ```
    In order to avoid setting these variables each time, you can also add these
    two lines to the file ~/.bashrc.
+
  
 Running our synthesis tool:
 ===========================
  - Open a shell in the directory where you extracted this archive. 
+
  - If you only want to synthesize a shield from a safety specification, then
    executing
 
@@ -61,7 +62,7 @@ Any questions? Do not hesistate to contact the authors of the paper.
 Have fun!
 
 
-[^1]: R. Bloem, B. K¨onighofer, R. K¨onighofer, and C. Wang. Shield synthesis: Runtime enforcement
+[^1]: R. Bloem, B. Konighofer, R. Konighofer, and C. Wang. Shield synthesis: Runtime enforcement
 for reactive systems. In International Conference on Tools and Algorithms for Construction
 and Analysis of Systems. Springer, 2015.
 
