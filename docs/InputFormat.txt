@@ -1,37 +1,41 @@
 /*******************************************************************************
- 
- Header                                                                             
- File starts with 'dfa' and 6 non negative integers 'S', 'VI', 'VO', 'I', 'F', 
- 'E' seperated by spaces. 
- The interpretation of the integers is as follows
+                                                                        
+File starts with 'dfa' and 6 non negative integers 'S', 'VI', 'VO', 'I', 'F', 'E' 
+seperated by spaces. The interpretation of the integers is as follows
 
-    S = number of states
-    VI = number of input variables      
-    VO = number of output variables
-    I = number of initial states
-    F = number of final states
-    E = number of edges
-    
- The Header is followed by a line representing the initial states.  
- (min. 1 non negative integer)
- The index of the states start with 1.
- 
- This line is followed by a line representing the final states.
- (line is optional)
- Afterwars following E-lines represending the edges.
- 
- The index of input variables start with 1. The index of the 
- output variables wit 1 + 'VI' (number of input variables).
- 
- An edge is represented by the following integers 's' 's'' 'v1' 'v2' ... .
- The edge starts at state 's' and leads to state 's''. The edge is labeled by 
- greater or equal to zero integers 'v1' 'v2' .... A positive integer represents
- the corresponding variable, a negative integer the negated variable.
- If no label is present, the edge is always enabled.
+S = number of states
+VI = number of input variables      
+VO = number of output variables
+I = number of initial states
+F = number of final states
+E = number of edges
 
- At the end of the file, VI+VO lines should indicate the name of each input and 
- output variables, and its corresponding predicate representation if available.
- 
+The Header is followed by a line representing the initial states. 
+(min. 1 non negative integer)
+The index of the states start with 1.
+
+This line is followed by a line representing the final states.
+(line is optional)
+Afterwars following E-lines represending the edges.
+
+The index of input variables start with 1. The index of the 
+output variables wit 1 + 'VI' (number of input variables).
+
+An edge is represented by the following integers 's' 's'' 'v1' 'v2' ... .
+The edge starts at state 's' and leads to state 's''. The edge is labeled by 
+greater or equal to zero integers 'v1' 'v2' .... A positive integer represents
+the corresponding variable, a negative integer the negated variable.
+If no label is present, the edge is always enabled.
+
+At the end of the file, VI+VO lines should indicate the name of each input and 
+output variables, and its corresponding predicate representation if available.
+The last line of following example indicates that the output boolean variable v5
+has the name "u005" and it represents a predicates on real variable "u" as 
+"u > 0.05 | u < -0.05". Normally, real variables in the input predicates are considered
+as inputs, while real variables in the output predicates are considered as outputs. 
+However, you can always specified it clearly with "__i" or "__o" suffix in the variable name.
+Eg. "t__i > 20" and "u__o > 0.05 | u__o < -0.05"
+
 ***************************************************************************/
 
 Example: toyota_r26.dfa

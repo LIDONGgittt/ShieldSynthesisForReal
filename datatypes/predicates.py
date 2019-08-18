@@ -234,3 +234,17 @@ class Predicate(object):
 
         return constrain
 
+    def splitVars(self, default):
+        invars = set()
+        outvars = set()
+        for real_varname in self.vars:
+            if real_varname.startswith("__i"):
+                invars.add(self.vars[real_varname])
+            elif real_varname.startswith("__o"):
+                outvars.add(self.vars[real_varname])
+            elif default:
+                invars.add(self.vars[real_varname])
+            else:
+                outvars.add(self.vars[real_varname])
+
+        return list(invars), list(outvars)

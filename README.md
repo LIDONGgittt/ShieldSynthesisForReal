@@ -20,9 +20,9 @@ make it run, you need to:
 
    ```
    export PYTHONPATH=$PYTHONPATH:/path_to/pycudd2.0.2/pycudd
+   
    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/path_to/pycudd2.0.2/cudd-2.4.2/lib
     ```
-   
    In order to avoid setting these variables each time, you can also add these
    two lines to the file ~/.bashrc.
  
@@ -31,7 +31,7 @@ Running our synthesis tool:
  - Open a shell in the directory where you extracted this archive. 
  - If you only want to synthesize a shield from a safety specification, then
    executing
-   
+
    ```
    python ./shield.py -a realgo path/to/spec_automaton.dfa
    ```   

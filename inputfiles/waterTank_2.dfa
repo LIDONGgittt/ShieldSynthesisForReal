@@ -50,7 +50,7 @@ dfa 6 2 2 1 1 36
 6 6 
 1 l1 (level < 100) #input the level of the water tank
 2 l2 (level <= 93) #input
-3 I1 (inflow == 0) #output
+3 I1 (inflow == 0) #output the inflow of the water tank
 4 O1 (outflow > 0 & outflow < 1) #output the outflow of the water tank 
 # (1,2) (3), (4)
 # conflict (-1 2)

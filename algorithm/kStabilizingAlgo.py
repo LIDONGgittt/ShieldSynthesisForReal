@@ -366,6 +366,8 @@ class KStabilizingAlgo(object):
         predicate_parser = Predicate()
         constrain_dict = dict()
         output_in_predicates = []
+        invars = []
+        outvars = []
 
         for varN in self.sdDFA_.getOutputVars():
             varName = self.sdDFA_.getVarName(varN)[:-3]
@@ -376,6 +378,7 @@ class KStabilizingAlgo(object):
                 output_in_predicates.append(varN)
                 predicate_ast = predicate_parser.tokenizeAndParse(predicates[varName])
                 constrain_dict[varName] = predicate_parser.generateConstrain(predicate_ast)
+                invars, outvars = predicate_parser.splitVars(False)
 
         for pred in range(0, len(output_in_predicates)+1):
             for subset in combinations(output_in_predicates, pred):
@@ -390,7 +393,12 @@ class KStabilizingAlgo(object):
                         literals.append(varN*-1)
                 label = DfaLabel(literals)
                 s.push()
-                if self.isPredicatesFeasible(s, constrain_dict, truePred):
+
+                # only apply ForAll quantifier when there are both in and out vars in one predicates
+                if len(invars) == 0 or len(outvars) == 0:
+                    invars = []
+
+                if self.isPredicatesFeasible(s, constrain_dict, truePred, invars):
                     self.fsDFA_.addEdge(stateOne, stateOne, label)
                 else:
                     self.fsDFA_.addEdge(stateOne, stateTwo, label)
@@ -404,6 +412,8 @@ class KStabilizingAlgo(object):
         predicate_parser = Predicate()
         constrain_dict = dict()
         input_in_predicates = []
+        invars = []
+        outvars = []
 
         for varN in self.specDfa_.getInputVars():
             varName = self.specDfa_.getVarName(varN)
@@ -413,6 +423,7 @@ class KStabilizingAlgo(object):
                 input_in_predicates.append(varN)
                 predicate_ast = predicate_parser.tokenizeAndParse(predicates[varName])
                 constrain_dict[varName] = predicate_parser.generateConstrain(predicate_ast)
+                invars, outvars = predicate_parser.splitVars(True)
 
         for varN in self.specDfa_.getOutputVars():
             varName = self.specDfa_.getVarName(varN)
@@ -473,20 +484,31 @@ class KStabilizingAlgo(object):
                 label = DfaLabel(literals)
 
                 s.push()
-                if self.isPredicatesFeasible(s, constrain_dict, truePred):
+                # only apply ForAll quantifier when there are both in and out vars in one predicates
+                if len(invars) == 0 or len(outvars) == 0:
+                    invars = []
+
+                if self.isPredicatesFeasible(s, constrain_dict, truePred, invars):
                     for out_label in label1:
                         self.drDFA_.addEdge(stateOne, stateOne, label.merge(out_label))
                 else:
                     self.drDFA_.addEdge(stateOne, stateTwo, label)
                 s.pop()
 
-    def isPredicatesFeasible(self, solver, constrains, truePred):
-        for varName in constrains:
-            if varName in truePred:
-                solver.add(constrains[varName])
-            else:
-                solver.add(Not(constrains[varName]))
+    def isPredicatesFeasible(self, solver, constrains, truePred, invars):
+        constrain = True
 
+        for varName in constrains:
+            predicate = constrains[varName]
+            if varName in truePred:
+                constrain = And(constrain, predicate)
+            else:
+                constrain = And(constrain, Not(predicate))
+
+        if len(invars) > 0:
+            constrain = ForAll(list(invars), constrain)
+
+        solver.add(constrain)
         if solver.check() == CheckSatResult(Z3_L_TRUE):
             return True
         return False
