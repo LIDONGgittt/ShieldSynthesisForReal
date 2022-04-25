@@ -1,5 +1,6 @@
 ## This repo is for backup only  
-Forked from https://bitbucket.org/mengwu/shield-synthesis/src/shield4real/
+Forked from https://bitbucket.org/mengwu/shield-synthesis/src/shield4real/  
+@Author [Meng Wu](https://github.com/meng-wu)
 
 ---
 ---
